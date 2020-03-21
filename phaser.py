@@ -83,9 +83,7 @@ _ios = [
         Subsignal("rxp", Pins("D9")),
         Subsignal("rxn", Pins("C9")),
     ),
-    ]
 
-[
     ("ddram", 0,
         Subsignal("a", Pins(
             "L6 M5 P6 K6 M1 M3 N2 M6 "
