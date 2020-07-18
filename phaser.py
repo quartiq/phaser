@@ -77,7 +77,7 @@ _ios = [
         Subsignal("rxp", Pins("B10")),
         Subsignal("rxn", Pins("A10")),
     ),
-    ("mgt", 0,
+    ("mgt", 3,
         Subsignal("txp", Pins("D7")),
         Subsignal("txn", Pins("C7")),
         Subsignal("rxp", Pins("D9")),
