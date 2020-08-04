@@ -8,17 +8,22 @@ class Test(Module):
     def __init__(self, platform):
         self.submodules += CRG(platform)
 
-        for i in range(1):
+        i, o = [], []
+        for _ in range(1 << 8):
             cs = CosSinGen()
             self.submodules += cs
-            x = Signal.like(cs.x)
-            y = Signal.like(cs.y)
+            i.append(cs.z)
+            o.extend([cs.x, cs.y])
+        self.sync += [
+            Cat(i).eq(Cat(platform.request("test_point"), Cat(i)))
+        ]
+        z = Signal(max(len(_) for _ in o), reset_less=True)
+        for oi in o:
+            z, z0 = Signal.like(z), z
             self.sync += [
-                cs.z.eq(Cat(platform.request("test_point"), cs.z)),
-                y.eq(cs.y),
-                x.eq(cs.x),
-                platform.request("user_led").eq(x | y == 0),
+                z.eq(z0 ^ oi)
             ]
+        self.sync += platform.request("user_led").eq(z == 0)
 
 
 if __name__ == "__main__":

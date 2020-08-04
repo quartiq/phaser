@@ -6,29 +6,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def minimax_linear_approximation(ab, f, f1i):
-    """Minimax linear approximation
-
-    returns 1st order polynomial coefficients m, n
-    for linear minimax approximation mx + n of function f
-    between consecutive points in ab. The inverse of the
-    derivative of f is provided as f1i.
-    """
-    fab = f(ab)
-    a, b = ab[:-1], ab[1:]
-    fa, fb = fab[:-1], fab[1:]
-    m = (fa - fb)/(a - b)
-    c = f1i(m)
-    fc = f(c)
-    n = (fa + fc - m*(a + c))/2
-    e = m*a + n - fa
-    np.testing.assert_allclose(m*b + n - fb, e)
-    np.testing.assert_allclose(m*c + n - fc, -e)
-    #x = np.linspace(a, b, 100)
-    #np.testing.assert_array_less(np.absolute(m*x + n - f(x)), np.ones_like(x)*1.00001*e)
-    return m, n
-
-
 class CosSinGen(mg.Module):
     """cos(z), sin(z) generator using a block ROM and linear interpolation
 
@@ -86,18 +63,9 @@ class CosSinGen(mg.Module):
         assert zl >= 0
 
         # generate the cos/sin LUT
-        ab = np.pi/4/(1 << zl)*np.arange((1 << zl) + 1)
-        if xd:
-            cm, cn = minimax_linear_approximation(ab, np.cos, lambda x: np.arcsin(-x))
-            sm, sn = minimax_linear_approximation(ab, np.sin, lambda x: np.arccos(x))
-            csd = cm + 1j*sm
-            cs = cn + 1j*sn + csd*(ab[:-1] + ab[1:])/2
-            csd = np.round((1 << xd)*np.pi/4/1j*csd)
-        else:
-            cs = np.exp(1j*ab)
-            cs = (cs[1:] + cs[:-1])/2
-            csd = np.zeros_like(cs)
-        cs = np.round(x_max*cs)
+        a = np.exp(1j*np.pi/4/(1 << zl)*(np.arange(1 << zl) + .5))
+        cs = np.round(x_max*a)
+        csd = np.round((1 << xd)*np.pi/4*a)
 
         lut_init = []
         for csi, csdi in zip(cs, csd):
@@ -109,22 +77,22 @@ class CosSinGen(mg.Module):
             lut_init.append(xi | (yi << x - 1))
             if xd:
                 # derivative LUT
-                # includes the 2pi/(1 << xd) = pi/4 scaling factor
-                # save a bit by noticing that cos(z) > 1/2 for 0 < z < pi/4
+                # save a bit again
                 xyd = csdi - (1 << xd - 1)
                 xid, yid = int(xyd.real), int(xyd.imag)
                 assert 0 <= xid < 1 << xd - 1
                 assert 0 <= yid < 1 << xd
                 lut_init[-1] |= (xid << 2*x - 1) | (yid << 2*x + xd - 2)
-        assert len(lut_init) == 1 << zl
 
         # LUT ROM
         mem_layout = [("x", x - 1), ("y", x)]
         if xd:
             mem_layout.extend([("xd", xd - 1), ("yd", xd)])
         lut_data = mg.Record(mem_layout, reset_less=True)
+        assert len(lut_init) == 1 << zl
         assert all(0 <= _ < 1 << len(lut_data) for _ in lut_init)
-        logger.info("CosSin LUT {} bit deep, {} bit wide".format(zl, len(lut_data)))
+        logger.info("CosSin LUT {} bit deep, {} bit wide".format(
+            zl, len(lut_data)))
         self.lut = mg.Memory(len(lut_data), 1 << zl, init=lut_init)
         lut_port = self.lut.get_port()
         self.specials += self.lut, lut_port
@@ -145,8 +113,6 @@ class CosSinGen(mg.Module):
         ]
         self.latency += 1  # mem address register
 
-        xl = lut_data.x | (1 << x - 1)
-        yl = lut_data.y
         if xd:  # apply linear interpolation
             zk = z - 3 - zl
             zd = mg.Signal((zk + 1, True), reset_less=True)
@@ -156,27 +122,26 @@ class CosSinGen(mg.Module):
             zq = z - 3 - x + xd
             assert zq > 0
             qb = (1 << zq - 1) - 1
-            lxd = mg.Signal((xd + zk - zq, True), reset_less=True)
-            lyd = mg.Signal((xd + zk - zq, True), reset_less=True)
+            lxd = mg.Signal((xd + zk, True), reset_less=True)
+            lyd = mg.Signal((xd + zk, True), reset_less=True)
             self.sync += [
-                lxd.eq((zd*(lut_data.xd | (1 << xd - 1)) + qb) >> zq),
-                lyd.eq((zd*lut_data.yd + qb) >> zq),
+                lxd.eq(zd*(lut_data.xd | (1 << xd - 1))),
+                lyd.eq(zd*lut_data.yd),
             ]
-            xl = self.pipe(xl, 1) - lyd
-            yl = self.pipe(yl, 1) + lxd
-            self.latency += 1
-        x1 = self.pipe(xl, 0)
-        y1 = self.pipe(yl, 0)
+            x1 = self.pipe(self.pipe(lut_data.x | (1 << x - 1), 1) - ((lyd + qb) >> zq), 1)
+            y1 = self.pipe(self.pipe(lut_data.y, 1) + ((lxd + qb) >> zq), 1)
+            self.latency += 2
+        else:
+            x1 = self.pipe(lut_data.x | (1 << x - 1), 0)
+            y1 = self.pipe(lut_data.y, 0)
 
         # unmap octant
         zq = self.pipe(mg.Cat(self.z[-3] ^ self.z[-2],
                               self.z[-2] ^ self.z[-1], self.z[-1]), self.latency)
         # intermediate unmapping signals
-        x2 = mg.Signal((x + 1, True))
-        y2 = mg.Signal((x + 1, True))
+        x2 = self.pipe(mg.Mux(zq[0], y1, x1), 0)
+        y2 = self.pipe(mg.Mux(zq[0], x1, y1), 0)
         self.comb += [
-            x2.eq(mg.Mux(zq[0], y1, x1)),
-            y2.eq(mg.Mux(zq[0], x1, y1)),
             self.x.eq(mg.Mux(zq[1], -x2, x2)),
             self.y.eq(mg.Mux(zq[2], -y2, y2)),
         ]
@@ -220,17 +185,3 @@ class CosSinGen(mg.Module):
         assert xye.mean() < 1e-3
         return (xye, np.fabs(np.r_[xye.real, xye.imag]).max(),
                 (xye2**2).mean()**.5, xye2.max())
-
-    def verify(self):
-        """Verify that the numerical model and the gateware
-        implementation are equivalent."""
-        co = CosSin(z=len(self.z), x=len(self.x) - 1,
-                    zl=mg.log2_int(self.lut.depth),
-                    xd=self.lut.width//2 - len(self.x) + 2)
-        z = np.arange(1 << len(self.z))
-        xy0 = np.array(co.xy(z))
-        xy = []
-        mg.Simulator(self, [self.log(z, xy)]).run()
-        xy = np.array(xy).T
-        np.testing.assert_allclose(xy, xy0)
-        return xy
