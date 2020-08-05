@@ -272,7 +272,7 @@ class Platform(XilinxPlatform):
             "set_property BITSTREAM.CONFIG.OVERTEMPPOWERDOWN Enable [current_design]",
             "set_property BITSTREAM.GENERAL.COMPRESS True [current_design]",
             "set_property BITSTREAM.CONFIG.CONFIGRATE 33 [current_design]",
-            "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 2 [current_design]",
+            "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]",
             "set_property BITSTREAM.CONFIG.USR_ACCESS TIMESTAMP [current_design]",
             "set_property BITSTREAM.CONFIG.USERID \"{:#010x}\" [current_design]".format(self.userid),
             "set_property CFGBVS VCCO [current_design]",
