@@ -126,7 +126,7 @@ _ios = [
         Subsignal("cnvn_p", Pins("H22")),
         Subsignal("sdo_n", Pins("K22 M21")),
         Subsignal("sdo_p", Pins("K21 L21")),
-        IOStandard("LVDS25")
+        IOStandard("LVDS_25")
     ),
 
     ("trf_ctrl", 0,
@@ -193,16 +193,16 @@ _ios = [
         IOStandard("LVCMOS33")
     ),
 
-    ("dac", 0,
+    ("dac_data", 0,
         Subsignal("data_a_n", Pins(
             "F20 D19 E18 C22 C17 A19 E17 D21 "
             "D16 C19 B18 D15 E14 F14 B16 C15")),
         Subsignal("data_a_p", Pins(
-            "G16 M20 G20 H19 H18 L18 J21 H15 "
-            "L16 L15 K14 J17 H14 L20 G13 L13")),
-        Subsignal("data_b_n", Pins(
             "F19 E19 F18 B22 D17 A18 F16 E21 "
             "E16 C18 B17 D14 E13 F13 B15 C14")),
+        Subsignal("data_b_n", Pins(
+            "G16 M20 G20 H19 H18 L18 J21 H15 "
+            "L16 L15 K14 J17 H14 L20 G13 L13")),
         Subsignal("data_b_p", Pins(
             "G15 N20 H20 J19 H17 M18 J20 J15 "
             "K16 L14 K13 K17 J14 L19 H13 M13")),
@@ -216,7 +216,7 @@ _ios = [
         Subsignal("paritycd_p", Pins("G17")),
         Subsignal("sync_n", Pins("A14")),
         Subsignal("sync_p", Pins("A13")),
-        IOStandard("LVDS25")
+        IOStandard("LVDS_25")
     ),
 ]
 
@@ -261,8 +261,7 @@ _connectors = [
 
 class Platform(XilinxPlatform):
     userid = 0xffffffff
-
-    def __init__(self):
+    def __init__(self, load=False, flash=False):
         XilinxPlatform.__init__(
                 self, "xc7a100t-fgg484-2", _ios, _connectors,
                 toolchain="vivado")
@@ -278,3 +277,29 @@ class Platform(XilinxPlatform):
             "set_property CFGBVS VCCO [current_design]",
             "set_property CONFIG_VOLTAGE 2.5 [current_design]",
         ])
+        if load:
+            self.toolchain.additional_commands.extend([
+                "open_hw_manager",
+                "connect_hw_server",
+                "open_hw_target",
+                "current_hw_device [lindex [get_hw_devices] 0]",
+                # "set_property PROGRAM.FILE {{{build_name}.bit}} [current_hw_device]",
+                # "program_hw_devices",
+                # "refresh_hw_device",
+                "write_cfgmem -force -format MCS -size 8 -interface SPIx4 -loadbit \"up 0x0 {build_name}.bit\" {build_name}",
+                "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {{s25fl128sxxxxxx0-spi-x1_x2_x4}}] 0]",
+                "set_property PROGRAM.BLANK_CHECK 0 [current_hw_cfgmem]",
+                "set_property PROGRAM.ERASE 1 [current_hw_cfgmem]",
+                "set_property PROGRAM.CFG_PROGRAM 1 [current_hw_cfgmem]",
+                "set_property PROGRAM.VERIFY 1 [current_hw_cfgmem]",
+                "set_property PROGRAM.CHECKSUM 0 [current_hw_cfgmem]",
+                "set_property PROGRAM.ADDRESS_RANGE {{use_file}} [current_hw_cfgmem]",
+                "set_property PROGRAM.FILES {{{build_name}.mcs}} [current_hw_cfgmem]",
+                "set_property PROGRAM.UNUSED_PIN_TERMINATION {{pull-none}} [current_hw_cfgmem]",
+                "create_hw_bitstream -hw_device [current_hw_device] [get_property PROGRAM.HW_CFGMEM_BITFILE [current_hw_device]]",
+                "program_hw_devices"] + ([
+                    "program_hw_cfgmem",
+                    "boot_hw_device"]
+                    if flash else []) + [
+                "close_hw_target",
+                "close_hw_manager"])
