@@ -259,12 +259,23 @@ _connectors = [
     }),
 ]
 
+
+_extensions = [
+    ("eem", i, IOStandard("LVDS_25")) + tuple([
+        Subsignal("data{}_{}".format(j, p), Pins(
+            "eem{}:d{}{}_{}".format(i, j, "_cc" if j == 0 else "", p)))
+                for j in range(8) for p in "pn"])
+    for i in range(2)
+]
+
+
 class Platform(XilinxPlatform):
     userid = 0xffffffff
     def __init__(self, load=False, flash=False):
         XilinxPlatform.__init__(
                 self, "xc7a100t-fgg484-2", _ios, _connectors,
                 toolchain="vivado")
+        self.add_extension(_extensions)
         self.add_platform_command(
                 "set_property INTERNAL_VREF 0.750 [get_iobanks 35]")
         self.toolchain.bitstream_commands.extend([
