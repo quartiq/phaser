@@ -2,12 +2,30 @@ from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 
+class AsyncResetSynchronizerBUFG(Module):
+    def __init__(self, cd, async_reset):
+        if not hasattr(async_reset, "attr"):
+            i, async_reset = async_reset, Signal()
+            self.comb += async_reset.eq(i)
+        rst_meta = Signal()
+        rst_unbuf = Signal()
+        self.specials += [
+            Instance("FDPE", p_INIT=1, i_D=0, i_PRE=async_reset,
+                i_CE=1, i_C=cd.clk, o_Q=rst_meta,
+                attr={"async_reg", "ars_ff1"}),
+            Instance("FDPE", p_INIT=1, i_D=rst_meta, i_PRE=async_reset,
+                i_CE=1, i_C=cd.clk, o_Q=rst_unbuf,
+                attr={"async_reg", "ars_ff2"}),
+            Instance("BUFG", i_I=rst_unbuf, o_O=cd.rst)
+        ]
+
+
 class CRG(Module):
     def __init__(self, platform):
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_sys2 = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys2q = ClockDomain(reset_less=True)
-        self.clock_domains.cd_clk200 = ClockDomain()
+        # self.clock_domains.cd_clk200 = ClockDomain()
 
         self.comb += platform.request("clk_sel").eq(0)  # mmcx internal
 
@@ -41,7 +59,7 @@ class CRG(Module):
             Instance("BUFG", i_I=sys, o_O=self.cd_sys.clk),
             Instance("BUFG", i_I=sys2, o_O=self.cd_sys2.clk),
             Instance("BUFG", i_I=sys2q, o_O=self.cd_sys2q.clk),
-            Instance("BUFH", i_I=clk200, o_O=self.cd_clk200.clk),
-            AsyncResetSynchronizer(self.cd_sys, ~locked),
-            AsyncResetSynchronizer(self.cd_clk200, ~locked),
+            # Instance("BUFH", i_I=clk200, o_O=self.cd_clk200.clk),
+            # AsyncResetSynchronizer(self.cd_clk200, ~locked),
         ]
+        self.submodules += AsyncResetSynchronizerBUFG(self.cd_sys, ~locked)
