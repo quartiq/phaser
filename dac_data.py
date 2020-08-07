@@ -18,10 +18,17 @@ def parity(*x):
 class DacData(Module):
     def __init__(self, pins, swap=((0, 3), (1, 8))):
         self.data_sync = Signal()  # every second sys cycle
-        # 2 samples (01), 4 channels (ABCD)
+        self.blank = Signal()
+        # A0:C0, B0:D0, A1:C1, B1:D1
         self.data = [[
-            Signal((16, True), reset_less=True) for _ in range(2)
+            Signal(16, reset_less=True) for _ in range(2)
             ] for _ in range(4)]
+
+        words = [[Signal.like(i) for i in j] for j in self.data]
+        self.sync += Cat(words).eq(Cat(self.data))
+
+        par = Signal(len(self.data))
+        self.sync += par.eq(Cat([parity(*word) for word in self.data]))
 
         # 1/4 cycle delayed clock to have the rising edge on the A/C sample
         # without tweaking delays
@@ -33,12 +40,7 @@ class DacData(Module):
         self._oserdes([self.data_sync, 0, 0, 0],
                       pins.istr_parityab_p, pins.istr_parityab_n)
         # 32 bit parity
-        self._oserdes([
-            parity(self.data[0][0], self.data[2][0]),  # A0:C0
-            parity(self.data[1][0], self.data[3][0]),  # B0:D0
-            parity(self.data[0][1], self.data[2][1]),  # A1:C1
-            parity(self.data[1][1], self.data[3][1]),  # B1:D1
-            ], pins.paritycd_p, pins.paritycd_n)
+        self._oserdes(par, pins.paritycd_p, pins.paritycd_n)
         # external read pointer reset, to dac_clk*interpolation, not needed
         # self._oserdes([0, 0, 0, 0], pins.ostr_p, pins.ostr_n)
 
@@ -47,9 +49,7 @@ class DacData(Module):
                 (pins.data_a_p, pins.data_a_n),
                 (pins.data_b_p, pins.data_b_n)]):
             for j, pin in enumerate(zip(*port)):
-                # (A0j, B0j, A1j, B1j) or (C0j, D0j, C1j, D1j)
-                bits = [self.data[2*i][0][j], self.data[2*i + 1][0][j],
-                        self.data[2*i][1][j], self.data[2*i + 1][1][j]]
+                bits = [words[k][i][j] for k in range(4)]
                 if (i, j) in swap:  # sinara-hw/Phaser#102
                     bits = [~_ for _ in bits]
                     pin = pin[::-1]
