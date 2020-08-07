@@ -47,7 +47,7 @@ class CosSinGen(mg.Module):
     and generation of the phase input (e.g. a phase accumulator)
     is to be implemented elsewhere.
     """
-    def __init__(self, z=18, x=15, zl=9, xd=4):
+    def __init__(self, z=18, x=15, zl=9, xd=4, backoff=None):
         self.latency = 0  # computed later
         self.z = mg.Signal(z)  # input phase
         self.x = mg.Signal((x + 1, True), reset_less=True)  # output cos(z)
@@ -55,7 +55,9 @@ class CosSinGen(mg.Module):
 
         ###
 
-        x_max = (1 << x) - 1
+        if backoff is None:
+            backoff = min(3, (1 << x - 1) - 1)
+        self.x_max = (1 << x) - backoff
 
         # LUT depth
         if zl is None:
@@ -64,24 +66,24 @@ class CosSinGen(mg.Module):
 
         # generate the cos/sin LUT
         a = np.exp(1j*np.pi/4/(1 << zl)*(np.arange(1 << zl) + .5))
-        cs = np.round(x_max*a)
-        csd = np.round((1 << xd)*np.pi/4*a)
+        cs = np.round(self.x_max*a)
+        csd = np.round(np.pi/4/(1 << x - xd)*cs)
 
         lut_init = []
         for csi, csdi in zip(cs, csd):
             # save a bit by noticing that cos(z) > 1/2 for 0 < z < pi/4
             xy = csi - (1 << x - 1)
             xi, yi = int(xy.real), int(xy.imag)
-            assert 0 <= xi < 1 << x - 1
-            assert 0 <= yi < 1 << x
+            assert 0 <= xi < 1 << x - 1, csi
+            assert 0 <= yi < 1 << x, csi
             lut_init.append(xi | (yi << x - 1))
             if xd:
                 # derivative LUT
                 # save a bit again
                 xyd = csdi - (1 << xd - 1)
                 xid, yid = int(xyd.real), int(xyd.imag)
-                assert 0 <= xid < 1 << xd - 1
-                assert 0 <= yid < 1 << xd
+                assert 0 <= xid < 1 << xd - 1, csdi
+                assert 0 <= yid < 1 << xd, csdi
                 lut_init[-1] |= (xid << 2*x - 1) | (yid << 2*x + xd - 2)
 
         # LUT ROM
