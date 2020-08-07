@@ -46,7 +46,7 @@ class ComplexMultiplier(Module):
         ad = Signal((awidth + 1, True), reset_less=True)
         bs = Signal((bwidth + 1, True), reset_less=True)
         bd = Signal((bwidth + 1, True), reset_less=True)
-        m = [Signal((awidth + bwidth + 1, True), reset_less=True) for _ in range(6)]
+        m = [Signal((awidth + bwidth + 2, True), reset_less=True) for _ in range(8)]
         self.sync += [
             Cat(ai).eq(Cat(self.a.i, ai)),  # 1-3
             Cat(aq).eq(Cat(self.a.q, aq)),  # 1-3
@@ -54,15 +54,19 @@ class ComplexMultiplier(Module):
             Cat(bq).eq(Cat(self.b.q, bq)),  # 1-2
             ad.eq(self.a.i - self.a.q),  # 1
             m[0].eq(ad*bi[0]),  # 2
-            m[1].eq(m[0]),  # 3
+            m[1].eq(m[0] + bias),  # 3
             bd.eq(bi[1] - bq[1]),  # 3
             bs.eq(bi[1] + bq[1]),  # 3
             m[2].eq(bd*ai[2]),  # 4
             m[3].eq(bs*aq[2]),  # 4
-            m[4].eq(m[1] + bias),  # 4
-            m[5].eq(m[1] + bias),  # 4
-            self.p.i.eq((m[2] + m[4]) >> bias_bits),  # 5
-            self.p.q.eq((m[3] + m[5]) >> bias_bits),  # 5
+            m[4].eq(m[1]),  # 4
+            m[5].eq(m[1]),  # 4
+            m[6].eq(m[2] + m[4]),  # 5
+            m[7].eq(m[3] + m[5]),  # 5
+        ]
+        self.comb += [
+            self.p.i.eq(m[6][bias_bits:]),
+            self.p.q.eq(m[7][bias_bits:]),
         ]
         self.latency = 5
 
