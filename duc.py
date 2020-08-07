@@ -12,18 +12,33 @@ def complex(width):
 class ComplexMultiplier(Module):
     def __init__(self, awidth=16, bwidth=None, pwidth=None):
         """
-        pipelined, 3 DSP, round half up
+        Complex multiplier, with full pipelining, using 3 DSP,
+        round half up.
+
+        `p.i + 1j*p.q = (a.i + 1j*a.q)*(b.i + 1j*b.q)`
+
+        Output scaling and rounding:
+
+        * If `pwidth < awidth + bwidth + 1`,
+            `|a| = (1 << awidth - 1) - 1`, and
+            `|b| = (1 << bwidth - 1) - 1`, then
+            `p.i` and `p.q` will be valid and `|p|` near its maximum.
+        * Ensure that |a| and |b| are in range and not just their
+          quadratures.
+        * That range excludes both the components' (negative) minimum
+          and the area on and outside the unit circle.
         """
         if bwidth is None:
             bwidth = awidth
         if pwidth is None:
+            # worst case min*min+min*min
             pwidth = awidth + bwidth + 1
         self.a = complex(awidth)  # 5
         self.b = complex(bwidth)  # 5
         self.p = complex(pwidth)
 
-        bias_bits = max(0, awidth + bwidth - pwidth)
-        bias = 1 << bias_bits - 2 if bias_bits >= 2 else 0
+        bias_bits = max(0, awidth + bwidth - pwidth - 1)
+        bias = 1 << bias_bits - 1 if bias_bits > 0 else 0
 
         ai = [Signal((awidth, True), reset_less=True) for _ in range(3)]
         aq = [Signal((awidth, True), reset_less=True) for _ in range(3)]
@@ -54,6 +69,7 @@ class ComplexMultiplier(Module):
 
 
 class Accu(Module):
+    """Phase accumulator, with frequency, phase offset and clear"""
     def __init__(self, fwidth, pwidth):
         self.f = Signal(fwidth)  # 2
         self.p = Signal(pwidth)  # 1
@@ -71,6 +87,10 @@ class Accu(Module):
 
 
 class MCM(Module):
+    """Multiple constant multiplication
+
+    Multiplies the input by multiple small constants.
+    """
     def __init__(self, width, constants, sync=False):
         n = len(constants)
         self.i = i = Signal(width)  # int(sync)
@@ -79,8 +99,8 @@ class MCM(Module):
         ###
 
         # TODO: improve MCM
-        assert range(n) == constants
         assert n <= 9
+        assert range(n) == constants
 
         if sync:
             ctx = self.sync
@@ -107,6 +127,15 @@ class MCM(Module):
 
 
 class PhasedAccu(Accu):
+    """Phase accumulator with multiple phased outputs.
+
+    Output data (across cycles and outputs) is such
+    that there is always one frequency word offset between successive
+    phas samples.
+
+    * Input frequency, phase offset, clear
+    * Output `n` phase samples per cycle
+    """
     def __init__(self, n=2, fwidth=32, pwidth=18):
         self.f = Signal(fwidth)  # 3
         self.p = Signal(pwidth)  # 2
@@ -129,12 +158,17 @@ class PhasedAccu(Accu):
 
 
 class PhaseModulator(Module):
+    """Complex phase modulator/shifter.
+
+    * Shifts input `i` by phase `z`
+    * Output `o`
+    """
     def __init__(self, **kwargs):
         self.submodules.cs = CosSinGen(**kwargs)
         self.submodules.mul = ComplexMultiplier(
             awidth=len(self.cs.x), pwidth=len(self.cs.x))
-        self.z = self.cs.z
-        self.i = self.mul.b
+        self.z = self.cs.z  # cs.z + 1 + mul.a
+        self.i = self.mul.b  # mul.b
         self.o = self.mul.p
         self.sync += [
             self.mul.a.i.eq(self.cs.x),
@@ -143,14 +177,26 @@ class PhaseModulator(Module):
 
 
 class PhasedDUC(Module):
+    """Phased digital upconverter/frequency shifter.
+
+    * Input phased complex input sample `j` as `modulators[j].i`
+    * Shift by frequency `accu.f`, phase `accu.p` (phase accumulator clear as
+    `accu.clr`).
+    * Output phased sample `j` as `modulators[j].o`.
+    """
     def __init__(self, **kwargs):
         self.submodules.accu = PhasedAccu(**kwargs)
-        self.modulators = []
+        self.f, self.p, self.clr = self.accu.f, self.accu.p, self.accu.clr
+        self.i = []
+        self.o = []
+        self.mods = []
         for i in range(len(self.accu.z)):
             mod = PhaseModulator()
-            self.modulators.append(mod)
+            self.mods.append(mod)
             self.comb += mod.z.eq(self.accu.z[i][-len(mod.z):])
-        self.submodules += self.modulators
+            self.i.append(mod.i)
+            self.o.append(mod.o)
+        self.submodules += self.mods
 
 
 class Test(Module):
@@ -162,12 +208,12 @@ class Test(Module):
         for i in range(2):
             duc = PhasedDUC()
             self.submodules += duc
-            ins.extend([duc.accu.f, duc.accu.p, duc.accu.clr])
-            for j, mod in enumerate(duc.modulators):
-                ins.extend([mod.i.i, mod.i.q])
+            ins.extend([duc.f, duc.p, duc.clr])
+            for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
+                ins.extend([ji.i, ji.q])
                 self.comb += [
-                    data.data[2*i][j].eq(mod.o.i),
-                    data.data[2*i + 1][j].eq(mod.o.q),
+                    data.data[2*j][i].eq(jo.i),
+                    data.data[2*j + 1][i].eq(jo.q),
                 ]
         self.sync += Cat(ins).eq(Cat(platform.request("test_point"), Cat(ins)))
 
