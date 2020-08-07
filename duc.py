@@ -17,16 +17,15 @@ class ComplexMultiplier(Module):
 
         `p.i + 1j*p.q = (a.i + 1j*a.q)*(b.i + 1j*b.q)`
 
-        Output scaling and rounding:
-
-        * If `pwidth < awidth + bwidth + 1`,
-            `|a| = (1 << awidth - 1) - 1`, and
-            `|b| = (1 << bwidth - 1) - 1`, then
-            `p.i` and `p.q` will be valid and `|p|` near its maximum.
+        Output scaling and rounding for `pwidth < awidth + bwidth + 1`:
+        * If `|a| <= (1 << awidth - 1) - 1`, or
+            `|b| <= (1 << bwidth - 1) - 1`, then
+            `p.i`, `p.q`, |p| will be valid.
         * Ensure that |a| and |b| are in range and not just their
           quadratures.
-        * That range excludes both the components' (negative) minimum
-          and the area on and outside the unit circle.
+        * That range excludes the components' (negative) minimum of at least
+          one input that input's unit circle and the area outside the unit circles
+          of both inputs.
         """
         if bwidth is None:
             bwidth = awidth
@@ -55,13 +54,13 @@ class ComplexMultiplier(Module):
             Cat(bq).eq(Cat(self.b.q, bq)),  # 1-2
             ad.eq(self.a.i - self.a.q),  # 1
             m[0].eq(ad*bi[0]),  # 2
-            m[1].eq(m[0] + bias),  # 3
+            m[1].eq(m[0]),  # 3
             bd.eq(bi[1] - bq[1]),  # 3
             bs.eq(bi[1] + bq[1]),  # 3
             m[2].eq(bd*ai[2]),  # 4
             m[3].eq(bs*aq[2]),  # 4
-            m[4].eq(m[1]),  # 4
-            m[5].eq(m[1]),  # 4
+            m[4].eq(m[1] + bias),  # 4
+            m[5].eq(m[1] + bias),  # 4
             self.p.i.eq((m[2] + m[4]) >> bias_bits),  # 5
             self.p.q.eq((m[3] + m[5]) >> bias_bits),  # 5
         ]
@@ -131,7 +130,7 @@ class PhasedAccu(Accu):
 
     Output data (across cycles and outputs) is such
     that there is always one frequency word offset between successive
-    phas samples.
+    phase samples.
 
     * Input frequency, phase offset, clear
     * Output `n` phase samples per cycle
