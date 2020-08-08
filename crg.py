@@ -31,24 +31,31 @@ class CRG(Module):
 
         clk125 = platform.request("clk125_gtp")
         platform.add_period_constraint(clk125, 8.)
-        self.clk125_buf = Signal()
+        self.clk125 = Signal()
         self.clk125_div2 = Signal()
-        self.specials += Instance("IBUFDS_GTE2",
-            i_CEB=0,
-            i_I=clk125.p, i_IB=clk125.n,
-            o_O=self.clk125_buf,
-            o_ODIV2=self.clk125_div2)
-
+        self.clk125_buf = Signal()
+        self.specials += [
+            Instance("IBUFDS_GTE2",
+                i_CEB=0,
+                i_I=clk125.p, i_IB=clk125.n,
+                o_O=self.clk125,
+                o_ODIV2=self.clk125_div2),
+            Instance("BUFH",
+                i_I=self.clk125, o_O=self.clk125_buf),
+        ]
         locked = Signal()
         fb = Signal()
         sys = Signal()
         sys2 = Signal()
         sys2q = Signal()
         clk200 = Signal()
+        clk200_buf = Signal()
+        delay_rdy = Signal()
         self.specials += [
             Instance("MMCME2_BASE",
-                p_CLKIN1_PERIOD=16.0, p_DIVCLK_DIVIDE=1, i_CLKIN1=self.clk125_div2,
-                p_CLKFBOUT_MULT_F=16, i_CLKFBIN=fb, o_CLKFBOUT=fb,
+                p_BANDWIDTH="HIGH",
+                p_CLKIN1_PERIOD=8.0, p_DIVCLK_DIVIDE=1, i_CLKIN1=self.clk125_buf,
+                p_CLKFBOUT_MULT_F=8, i_CLKFBIN=fb, o_CLKFBOUT=fb,
                 o_LOCKED=locked,
                 #p_CLKOUT0_DIVIDE_F=4, p_CLKOUT0_PHASE=0, o_CLKOUT0=sys,
                 p_CLKOUT1_DIVIDE=2, p_CLKOUT1_PHASE=0, o_CLKOUT1=sys2,
@@ -59,7 +66,9 @@ class CRG(Module):
             Instance("BUFG", i_I=sys, o_O=self.cd_sys.clk),
             Instance("BUFG", i_I=sys2, o_O=self.cd_sys2.clk),
             Instance("BUFG", i_I=sys2q, o_O=self.cd_sys2q.clk),
-            # Instance("BUFH", i_I=clk200, o_O=self.cd_clk200.clk),
-            # AsyncResetSynchronizer(self.cd_clk200, ~locked),
+            Instance("BUFG", i_I=clk200, o_O=clk200_buf),
+            Instance("IDELAYCTRL",
+                i_REFCLK=clk200_buf, i_RST=~locked, o_RDY=delay_rdy),
         ]
-        self.submodules += AsyncResetSynchronizerBUFG(self.cd_sys, ~locked)
+        self.submodules += AsyncResetSynchronizerBUFG(
+            self.cd_sys, ~(locked & delay_rdy))
