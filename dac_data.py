@@ -17,7 +17,7 @@ def parity(*x):
 
 class DacData(Module):
     def __init__(self, pins, swap=((0, 3), (1, 8))):
-        self.data_sync = Signal()  # every second sys cycle
+        self.data_sync = Signal()  # every 8 samples (4 sys cycles)
         self.blank = Signal()
         # A0:C0, B0:D0, A1:C1, B1:D1
         self.data = [[
