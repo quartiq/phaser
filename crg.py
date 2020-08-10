@@ -25,7 +25,6 @@ class CRG(Module):
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_sys2 = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys2q = ClockDomain(reset_less=True)
-        # self.clock_domains.cd_clk200 = ClockDomain()
 
         self.comb += platform.request("clk_sel").eq(0)  # mmcx internal
 

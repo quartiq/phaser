@@ -1,4 +1,5 @@
 from migen import *
+from migen.genlib.io import DifferentialOutput
 import itertools, operator
 
 
@@ -27,7 +28,7 @@ class DacData(Module):
         words = [[Signal.like(i) for i in j] for j in self.data]
         self.sync += Cat(words).eq(Cat(self.data))
 
-        par = Signal(len(self.data))
+        par = Signal(len(self.data), reset_less=True)
         self.sync += par.eq(Cat([parity(*word) for word in self.data]))
 
         # 1/4 cycle delayed clock to have the rising edge on the A/C sample
@@ -62,14 +63,12 @@ class DacData(Module):
                 p_DATA_RATE_OQ="DDR", p_DATA_RATE_TQ="BUF",
                 p_DATA_WIDTH=4, p_TRISTATE_WIDTH=1,
                 p_INIT_OQ=0b00000000,
-                o_OQ=pin,
                 i_RST=ResetSignal(),
                 i_CLK=ClockSignal(clk),
                 i_CLKDIV=ClockSignal(),
+                # MSB is future, D1 is closest to Q
                 i_D1=data[0], i_D2=data[1], i_D3=data[2], i_D4=data[3],
-                i_D5=0, i_D6=0, i_D7=0, i_D8=0,
-                i_TCE=1, i_OCE=1,
-                i_T1=0, i_T2=0, i_T3=0, i_T4=0,
-                i_SHIFTIN1=0, i_SHIFTIN2=0, i_TBYTEIN=0),
-            Instance("OBUFDS", i_I=pin, o_O=pin_p, o_OB=pin_n),
+                i_TCE=1, i_OCE=1, i_T1=0,
+                o_OQ=pin),
+            DifferentialOutput(pin, pin_p, pin_n),
         ]
