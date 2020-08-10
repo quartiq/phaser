@@ -1,12 +1,22 @@
 from migen import *
 from cossin import CosSinGen
-from dac_data import DacData
 
 
 def complex(width):
     return Record(
         [("i", (width, True)), ("q", (width, True))],
         reset_less=True)
+
+
+def eqh(lhs, rhs):
+    """MSB aligned assignment"""
+    shift = len(lhs) - len(rhs)
+    if shift > 0:
+        return lhs[shift:].eq(rhs)
+    elif shift < 0:
+        return lhs.eq(rhs[-shift:])
+    else:
+        return lhs.eq(rhs)
 
 
 class ComplexMultiplier(Module):
@@ -18,14 +28,15 @@ class ComplexMultiplier(Module):
         `p.i + 1j*p.q = (a.i + 1j*a.q)*(b.i + 1j*b.q)`
 
         Output scaling and rounding for `pwidth < awidth + bwidth + 1`:
+        * Rounding is "round half down".
         * If `|a| <= (1 << awidth - 1) - 1`, or
             `|b| <= (1 << bwidth - 1) - 1`, then
             `p.i`, `p.q`, |p| will be valid.
         * Ensure that |a| and |b| are in range and not just their
           quadratures.
         * That range excludes the components' (negative) minimum of at least
-          one input that input's unit circle and the area outside the unit circles
-          of both inputs.
+          one input, that input's unit circle, and the area outside the unit
+          circles of both inputs.
         """
         if bwidth is None:
             bwidth = awidth
@@ -37,7 +48,7 @@ class ComplexMultiplier(Module):
         self.p = complex(pwidth)
 
         bias_bits = max(0, awidth + bwidth - pwidth - 1)
-        bias = 1 << bias_bits - 1 if bias_bits > 0 else 0
+        bias = (1 << bias_bits - 1) - 1 if bias_bits > 0 else 0
 
         ai = [Signal((awidth, True), reset_less=True) for _ in range(3)]
         aq = [Signal((awidth, True), reset_less=True) for _ in range(3)]
@@ -52,17 +63,17 @@ class ComplexMultiplier(Module):
             Cat(aq).eq(Cat(self.a.q, aq)),  # 1-3
             Cat(bi).eq(Cat(self.b.i, bi)),  # 1-2
             Cat(bq).eq(Cat(self.b.q, bq)),  # 1-2
-            ad.eq(self.a.i - self.a.q),  # 1
+            ad.eq(self.a.i + self.a.q),  # 1
             m[0].eq(ad*bi[0]),  # 2
             m[1].eq(m[0] + bias),  # 3
-            bd.eq(bi[1] - bq[1]),  # 3
             bs.eq(bi[1] + bq[1]),  # 3
-            m[2].eq(bd*ai[2]),  # 4
-            m[3].eq(bs*aq[2]),  # 4
+            bd.eq(bi[1] - bq[1]),  # 3
+            m[2].eq(bs*aq[2]),  # 4
+            m[3].eq(bd*ai[2]),  # 4
             m[4].eq(m[1]),  # 4
             m[5].eq(m[1]),  # 4
-            m[6].eq(m[2] + m[4]),  # 5
-            m[7].eq(m[3] + m[5]),  # 5
+            m[6].eq(m[4] - m[2]),  # 5
+            m[7].eq(m[5] - m[3]),  # 5
         ]
         self.comb += [
             self.p.i.eq(m[6][bias_bits:]),
@@ -94,9 +105,9 @@ class MCM(Module):
 
     Multiplies the input by multiple small constants.
     """
-    def __init__(self, width, constants, sync=False):
+    def __init__(self, width, constants):
         n = len(constants)
-        self.i = i = Signal(width)  # int(sync)
+        self.i = i = Signal(width, reset_less=True)  # 1
         self.o = o = [Signal.like(self.i) for i in range(n)]
 
         ###
@@ -105,10 +116,7 @@ class MCM(Module):
         assert n <= 9
         assert range(n) == constants
 
-        if sync:
-            ctx = self.sync
-        else:
-            ctx = self.comb
+        ctx = self.comb
         if n > 0:
             ctx += o[0].eq(0)
         if n > 1:
@@ -139,24 +147,29 @@ class PhasedAccu(Accu):
     * Input frequency, phase offset, clear
     * Output `n` phase samples per cycle
     """
-    def __init__(self, n=2, fwidth=32, pwidth=18):
-        self.f = Signal(fwidth)  # 3
-        self.p = Signal(pwidth)  # 2
-        self.clr = Signal(reset=1)  # 3
+    def __init__(self, n, fwidth, pwidth):
+        self.f = Signal(fwidth)
+        self.p = Signal(pwidth)
+        self.clr = Signal(reset=1)
         self.z = [Signal(pwidth, reset_less=True)
                   for _ in range(n)]
 
-        self.submodules.mcm = MCM(fwidth, range(n), sync=True)
+        self.submodules.mcm = MCM(fwidth, range(n))
         q = [Signal(fwidth, reset_less=True) for _ in range(2)]
+        clr_d = Signal(reset_less=True)
         self.sync += [
+            clr_d.eq(self.clr),
             q[0].eq(q[0] + (self.f << log2_int(n))),
-            If(self.clr,
+            self.mcm.i.eq(self.f),
+            If(self.clr | clr_d,
                 q[0].eq(0),
             ),
+            If(clr_d,
+                self.mcm.i.eq(0),
+            ),
             q[1].eq(q[0] + (self.p << fwidth - pwidth)),
-            self.mcm.i.eq(self.f),
-            [z.eq((q[1] + self.mcm.o[i])[-pwidth:])
-                for i, z in enumerate(self.z)]
+            [z.eq((q[1] + oi)[fwidth - pwidth:])
+                for oi, z in zip(self.mcm.o, self.z)]
         ]
 
 
@@ -194,9 +207,9 @@ class PhasedDUC(Module):
         self.o = []
         self.mods = []
         for i in range(len(self.accu.z)):
-            mod = PhaseModulator()
+            mod = PhaseModulator(z=len(self.accu.z[0]), x=15)
             self.mods.append(mod)
-            self.comb += mod.z.eq(self.accu.z[i][-len(mod.z):])
+            self.comb += mod.z.eq(self.accu.z[i])
             self.i.append(mod.i)
             self.o.append(mod.o)
         self.submodules += self.mods
@@ -209,7 +222,7 @@ class Test(Module):
         self.submodules += crg, data
         ins = []
         for i in range(2):
-            duc = PhasedDUC()
+            duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
             self.submodules += duc
             ins.extend([duc.f, duc.p, duc.clr])
             for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
@@ -224,6 +237,7 @@ class Test(Module):
 if __name__ == "__main__":
     from phaser import Platform
     from crg import CRG
+    from dac_data import DacData
     platform = Platform(load=True)
     test = Test(platform)
     platform.build(test)
