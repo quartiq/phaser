@@ -11,7 +11,7 @@ design.
   CIC/HBF/FIR, CIC droop compensation filter
 * [cic](https://nbviewer.jupyter.org/github/quartiq/phaser/blob/master/cic.ipynb): ideas for CIC implementations and tests of interpolation modes
 
-funded by [Oxford](https://github.com/OxfordIonTrapGroup)
+funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://github.com/OregonIons), [MITLL](https://www.ll.mit.edu/biographies/jeremy-m-sage)
 
 ## Hardware
 
