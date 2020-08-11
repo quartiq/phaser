@@ -4,7 +4,7 @@ from crg import CRG
 from cossin import CosSinGen
 
 
-class Test(Module):
+class Top(Module):
     def __init__(self, platform):
         self.submodules += CRG(platform)
 
@@ -29,5 +29,5 @@ class Test(Module):
 if __name__ == "__main__":
     from phaser import Platform
     platform = Platform(load=True)
-    test = Test(platform)
+    test = Top(platform)
     platform.build(test)
