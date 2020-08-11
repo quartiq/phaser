@@ -193,12 +193,11 @@ class PhaseModulator(Module):
 
 
 class PhasedDUC(Module):
-    """Phased digital upconverter/frequency shifter.
+    """Phased (multi-sample) digital upconverter/frequency shifter.
 
-    * Input phased complex input sample `j` as `modulators[j].i`
-    * Shift by frequency `accu.f`, phase `accu.p` (phase accumulator clear as
-    `accu.clr`).
-    * Output phased sample `j` as `modulators[j].o`.
+    * Input phased complex input sample index `j` as `i[j]`
+    * Shift by frequency `f`, phase `p` (phase accumulator clear as `clr`).
+    * Output phased sample index `j` as `o[j]`.
     """
     def __init__(self, **kwargs):
         self.submodules.accu = PhasedAccu(**kwargs)

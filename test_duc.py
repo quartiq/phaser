@@ -157,3 +157,71 @@ class TestMul(unittest.TestCase):
         ]
         self.dut = duc.ComplexMultiplier(awidth=16, pwidth=16)
         self.check([(ab[:2], ab[2:], do(*ab)) for ab in seq])
+
+
+class TestPhasedDUC(unittest.TestCase):
+    def setUp(self):
+        self.dut = duc.PhasedDUC(n=2, fwidth=32, pwidth=16)
+
+    def test_init(self):
+        self.assertEqual(len(self.dut.f), 32)
+        self.assertEqual(len(self.dut.p), 16)
+        for i in self.dut.i + self.dut.o:
+            self.assertEqual(len(i.i), 16)
+            self.assertEqual(len(i.q), 16)
+
+    def seq(self, samples, f, p, expect):
+        n = len(self.dut.i)
+        self.assertEqual(len(samples) % n, 0)
+        output = []
+        f_latency = 7
+        mul_latency = 8
+
+        def get():
+            for _ in range(f_latency + mul_latency):
+                yield
+            for _ in range(len(samples)//n):
+                for out in self.dut.o:
+                    oi = yield out.i
+                    oq = yield out.q
+                    output.append(oi + 1j*oq)
+                yield
+
+        def set():
+            yield self.dut.clr.eq(1)
+            yield self.dut.p.eq(p)
+            yield self.dut.f.eq(f)
+            yield
+            yield self.dut.clr.eq(0)
+            for _ in range(f_latency):
+                yield
+            for i, ins in enumerate(samples):
+                q, i = divmod(i, n)
+                if not i:
+                    yield
+                yield self.dut.i[i].i.eq(round(ins.real))
+                yield self.dut.i[i].q.eq(round(ins.imag))
+
+        run_simulation(self.dut, [get(), set()])
+        self.assertEqual(len(output), len(samples))
+        expect = [round(_.real) + 1j*round(_.imag) for _ in expect]
+        self.assertEqual(output, expect)
+        return output
+
+    def test_latency(self):
+        i = [0, 10, 0, 40]
+        o = self.seq(i, 0, 0, i)
+
+    def test_neg(self):
+        i = [0, 10, 50, 30j, -50j, 40-20j, -100+1j, 0]
+        o = self.seq(i, 0, 0x8000, [-_ for _ in i])
+
+    def test_quad(self):
+        i = [0, 10, 50, 30j, -50j, 40-20j, -100+1j, 0]
+        o = self.seq(i, 0, 0x4000, [1j*_ for _ in i])
+
+    def test_freq(self):
+        i = list(range(32))
+        f = 0x800 << 16
+        o = self.seq(i, f, 0,
+                     [1j**(i/8.)*j for i, j in enumerate(i)])
