@@ -20,20 +20,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-	run: |
-	  install git+https://github.com/m-labs/migen.git
-	  pip install git+https://github.com/m-labs/misoc.git
-	  pip install numpy flake8 pytest
-	  if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        run: |
+          install git+https://github.com/m-labs/migen.git
+          pip install git+https://github.com/m-labs/misoc.git
+          pip install numpy flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Lint with flake8
-	run: |
-	  # stop the build if there are Python syntax errors or undefined names
-	  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-	  # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-	  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest
-	run: |
-	  pytest
+        run: |
+          pytest
 
   # Tell bors about it
   # https://github.com/rtic-rs/cortex-m-rtic/blob/8a4f9c6b8ae91bebeea0791680f89375a78bffc6/.github/workflows/build.yml#L566-L603
