@@ -279,29 +279,29 @@ class TestMultiDDS(unittest.TestCase):
                 lat = 2
                 if i >= lat:
                     zi = phase(*divmod(i - lat, n))
-                    z = yield self.dut.cs.z
+                    z = yield self.dut.mod.z
                     self.assertEqual(z, zi)
                 # test scaler input
-                lat = 2 + self.dut.cs.latency + 1
+                lat = 2 + self.dut.mod.cs.latency + 1
                 if i >= lat:
                     ch = (i - lat) % n
-                    bi = yield self.dut.mul.b.i
+                    bi = yield self.dut.mod.i.i
                     self.assertEqual(bi, amp(ch))
                     aii, aiq = cossin(phase(*divmod(i - lat, n)))
-                    ai = yield self.dut.mul.a.i
-                    aq = yield self.dut.mul.a.q
+                    ai = yield self.dut.mod.mul.a.i
+                    aq = yield self.dut.mod.mul.a.q
                     self.assertLessEqual(abs(ai - aii), 2)
                     self.assertLessEqual(abs(aq - aiq), 2)
                 # test scaler and summation output
-                lat = 2 + self.dut.cs.latency + 1 + self.dut.mul.latency + 1
+                lat = 2 + self.dut.mod.latency + 1
                 if i >= lat and (yield self.dut.valid):
                     cyc = (i - lat) // n
                     oii, oiq = 0, 0
                     for ch in range(n):
                         pi, pq = cossin(phase(cyc, ch))
                         a = amp(ch)
-                        oii += (a*pi)/(1 << 15)
-                        oiq += (a*pq)/(1 << 15)
+                        oii += a*pi/(1 << 15)
+                        oiq += a*pq/(1 << 15)
                     oi = yield self.dut.o.i
                     oq = yield self.dut.o.q
                     # print((oi, oq), (oii, oiq))

@@ -38,8 +38,7 @@ def pipe(lhs, rhs, n):
 class ComplexMultiplier(Module):
     def __init__(self, awidth=16, bwidth=None, pwidth=None):
         """
-        Complex multiplier, with full pipelining, using 3 DSP,
-        round half up.
+        Complex multiplier, with full pipelining, using 3 DSP, rounding
 
         `p.i + 1j*p.q = (a.i + 1j*a.q)*(b.i + 1j*b.q)`
 
@@ -66,7 +65,11 @@ class ComplexMultiplier(Module):
         # with rounding the worst case is assumed (!) to be max*max
         # (unit circle interior: 2 bit smaller than full width worst
         # case above)
-        bias_bits = max(0, awidth + bwidth - pwidth - 1)
+        bias_bits = max(0, (awidth + bwidth - 1) - pwidth)
+        # rounding bias constant
+        # we don't implement more complicated rounding (even/odd) because
+        # doing so looks like it might not fit into the DSPs and
+        # due to the typically large shift the remaining bias is small.
         bias = (1 << bias_bits - 1) - 1 if bias_bits > 0 else 0
 
         ai = [Signal((awidth, True), reset_less=True) for _ in range(3)]
@@ -76,7 +79,10 @@ class ComplexMultiplier(Module):
         ad = Signal((awidth + 1, True), reset_less=True)
         bs = Signal((bwidth + 1, True), reset_less=True)
         bd = Signal((bwidth + 1, True), reset_less=True)
-        m = [Signal((awidth + bwidth + 2, True), reset_less=True) for _ in range(8)]
+        # these needs yet another (temporary) bit since the synthesizer
+        # usually doesn't prove the cancellation
+        m = [Signal((awidth + bwidth + 2, True), reset_less=True)
+             for _ in range(8)]
         self.sync += [
             Cat(ai).eq(Cat(self.a.i, ai)),  # 1-3
             Cat(aq).eq(Cat(self.a.q, aq)),  # 1-3
@@ -193,6 +199,26 @@ class PhasedAccu(Module):
         ]
 
 
+class PhaseModulator(Module):
+    """Complex phase modulator/shifter.
+
+    * Shifts input `i` by phase `z`
+    * Output `o`
+    """
+    def __init__(self, **kwargs):
+        self.submodules.cs = CosSinGen(**kwargs)
+        self.submodules.mul = ComplexMultiplier(
+            awidth=len(self.cs.x), pwidth=len(self.cs.x))
+        self.z = self.cs.z  # cs.z + 1 + mul.a
+        self.i = self.mul.b  # mul.b
+        self.o = self.mul.p
+        self.sync += [
+            self.mul.a.i.eq(self.cs.x),
+            self.mul.a.q.eq(self.cs.y),
+        ]
+        self.latency = self.cs.latency + 1 + self.mul.latency
+
+
 class MultiDDS(Accu):
     """Time division multiplexed oscillator.
 
@@ -208,9 +234,7 @@ class MultiDDS(Accu):
         self.stb = Signal()
         self.valid = Signal()
 
-        self.submodules.cs = CosSinGen()
-        self.submodules.mul = ComplexMultiplier(
-            awidth=len(self.cs.x), pwidth=len(self.cs.x))
+        self.submodules.mod = PhaseModulator()
         # accu
         accu = [Signal(fwidth) for _ in range(n)]
         run = Signal()
@@ -229,20 +253,19 @@ class MultiDDS(Accu):
                     ),
                 ),
                 If(cycle(ii + 1),
-                    self.cs.z.eq((accu[ii] + (ctrl.p << fwidth - len(ctrl.p))
-                                  )[fwidth - len(self.cs.z):]),
+                    self.mod.z.eq(
+                        (accu[ii] + (ctrl.p << fwidth - len(ctrl.p))
+                         )[fwidth - len(self.mod.z):]),
                 ),
-                If(cycle(ii + 2 + self.cs.latency),
-                    self.mul.b.i.eq(ctrl.a),
+                If(cycle(ii + 2 + self.mod.cs.latency),
+                    self.mod.i.i.eq(ctrl.a),
                 ),
             ]
 
-        # 4: q, z, mul.a, o
-        latency = self.cs.latency + self.mul.latency + 4 - 1
+        # 2: q, z
+        latency = self.mod.latency + 2
 
         self.sync += [
-            self.mul.a.i.eq(self.cs.x),
-            self.mul.a.q.eq(self.cs.y),
             If(run,
                 i.eq(i + 1),
             ),
@@ -255,31 +278,13 @@ class MultiDDS(Accu):
             ),
             If(run,
                 self.o.i.eq(Mux(cycle(latency), 0, self.o.i) +
-                            self.mul.p.i),
+                            self.mod.o.i),
                 self.o.q.eq(Mux(cycle(latency), 0, self.o.q) +
-                            self.mul.p.q),
+                            self.mod.o.q),
             ),
             self.valid.eq(run & cycle(latency - 1)),
         ]
 
-
-class PhaseModulator(Module):
-    """Complex phase modulator/shifter.
-
-    * Shifts input `i` by phase `z`
-    * Output `o`
-    """
-    def __init__(self, **kwargs):
-        self.submodules.cs = CosSinGen(**kwargs)
-        self.submodules.mul = ComplexMultiplier(
-            awidth=len(self.cs.x), pwidth=len(self.cs.x))
-        self.z = self.cs.z  # cs.z + 1 + mul.a
-        self.i = self.mul.b  # mul.b
-        self.o = self.mul.p
-        self.sync += [
-            self.mul.a.i.eq(self.cs.x),
-            self.mul.a.q.eq(self.cs.y),
-        ]
 
 
 class PhasedDUC(Module):
