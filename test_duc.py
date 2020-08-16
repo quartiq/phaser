@@ -1,3 +1,4 @@
+import numpy as np
 import unittest
 
 from migen import *
@@ -54,15 +55,18 @@ class TestPhasedAccu(unittest.TestCase):
             yield
             yield
             yield
+            # check phase offset with f=0
             self.assertEqual((yield self.dut.z[0]), 0x01)
             self.assertEqual((yield self.dut.z[1]), 0x01)
             yield self.dut.f.eq(0x10 << 16)
             yield
             yield
             yield
+            # check first cycle f increments
             self.assertEqual((yield self.dut.z[0]), 0x01)
             self.assertEqual((yield self.dut.z[1]), 0x11)
             yield
+            # second cycle f increments
             self.assertEqual((yield self.dut.z[0]), 0x21)
             self.assertEqual((yield self.dut.z[1]), 0x31)
             yield self.dut.clr.eq(1)
@@ -70,25 +74,32 @@ class TestPhasedAccu(unittest.TestCase):
             yield
             yield self.dut.clr.eq(0)
             yield
+            # cycle before clr
             self.assertEqual((yield self.dut.z[0]), 0x81)
             self.assertEqual((yield self.dut.z[1]), 0x91)
             yield
+            # first clr cycle
             self.assertEqual((yield self.dut.z[0]), 0x01)
             self.assertEqual((yield self.dut.z[1]), 0x01)
             yield
+            # second clr cycle
             self.assertEqual((yield self.dut.z[0]), 0x01)
             self.assertEqual((yield self.dut.z[1]), 0x01)
             yield self.dut.f.eq(0x20 << 16)
             yield
+            # first cycle after clr with old f
             self.assertEqual((yield self.dut.z[0]), 0x01)
             self.assertEqual((yield self.dut.z[1]), 0x11)
             yield
+            # second cycle with old f
             self.assertEqual((yield self.dut.z[0]), 0x21)
             self.assertEqual((yield self.dut.z[1]), 0x31)
             yield
+            # cycle with one old and one new
             self.assertEqual((yield self.dut.z[0]), 0x41)
             self.assertEqual((yield self.dut.z[1]), 0x61)
             yield
+            # cycle with only new increments
             self.assertEqual((yield self.dut.z[0]), 0x81)
             self.assertEqual((yield self.dut.z[1]), 0xa1)
         run_simulation(self.dut, gen())
@@ -225,3 +236,76 @@ class TestPhasedDUC(unittest.TestCase):
         f = 0x800 << 16
         o = self.seq(i, f, 0,
                      [1j**(i/8.)*j for i, j in enumerate(i)])
+
+
+class TestMultiDDS(unittest.TestCase):
+    def setUp(self):
+        self.dut = duc.MultiDDS(n=5, fwidth=32, xwidth=16)
+
+    def test_init(self):
+        for ctrl in self.dut.i:
+            self.assertEqual(len(ctrl.f), 32)
+            self.assertEqual(len(ctrl.p), 16)
+            self.assertEqual(len(ctrl.a), 15)
+            self.assertEqual(len(ctrl.clr), 1)
+        self.assertEqual(len(self.dut.o.i), 16)
+        self.assertEqual(len(self.dut.o.q), 16)
+
+    def test_seq(self):
+        n = len(self.dut.i)
+
+        def phase(cyc, ch):
+            return ((ch << 10) | (ch << 14)*(cyc + 1)) & 0x3ffff
+
+        def amp(ch):
+            return ch << 10
+
+        def cossin(z):
+            i = 0x7ffd*np.cos(z*2.*np.pi/(1 << 18))
+            q = 0x7ffd*np.sin(z*2.*np.pi/(1 << 18))
+            return i, q
+
+        def gen():
+            for i, ctrl in enumerate(self.dut.i):
+                yield ctrl.f.eq(i << 28)
+                yield ctrl.p.eq(i << 8)
+                yield ctrl.a.eq(i << 10)
+                yield ctrl.clr.eq(0)
+            yield self.dut.stb.eq(1)
+            yield  # run
+            for i in range(200):
+                yield
+                # test phase computation
+                lat = 2
+                if i >= lat:
+                    zi = phase(*divmod(i - lat, n))
+                    z = yield self.dut.cs.z
+                    self.assertEqual(z, zi)
+                # test scaler input
+                lat = 2 + self.dut.cs.latency + 1
+                if i >= lat:
+                    ch = (i - lat) % n
+                    bi = yield self.dut.mul.b.i
+                    self.assertEqual(bi, amp(ch))
+                    aii, aiq = cossin(phase(*divmod(i - lat, n)))
+                    ai = yield self.dut.mul.a.i
+                    aq = yield self.dut.mul.a.q
+                    self.assertLessEqual(abs(ai - aii), 2)
+                    self.assertLessEqual(abs(aq - aiq), 2)
+                # test scaler and summation output
+                lat = 2 + self.dut.cs.latency + 1 + self.dut.mul.latency + 1
+                if i >= lat and (yield self.dut.valid):
+                    cyc = (i - lat) // n
+                    oii, oiq = 0, 0
+                    for ch in range(n):
+                        pi, pq = cossin(phase(cyc, ch))
+                        a = amp(ch)
+                        oii += (a*pi)/(1 << 15)
+                        oiq += (a*pq)/(1 << 15)
+                    oi = yield self.dut.o.i
+                    oq = yield self.dut.o.q
+                    # print((oi, oq), (oii, oiq))
+                    self.assertLessEqual(abs(oi - oii), 4)
+                    self.assertLessEqual(abs(oq - oiq), 4)
+
+        run_simulation(self.dut, gen())

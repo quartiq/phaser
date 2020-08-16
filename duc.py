@@ -1,15 +1,18 @@
 from migen import *
+from misoc.interconnect.stream import Endpoint
+from migen.genlib.fsm import FSM
+
 from cossin import CosSinGen
 
 
 def complex(width):
-    return Record(
-        [("i", (width, True)), ("q", (width, True))],
-        reset_less=True)
+    """Complex integer layout"""
+    return [("i", (width, True)), ("q", (width, True))]
 
 
 def eqh(lhs, rhs):
-    """MSB aligned assignment"""
+    """MSB aligned assignment.
+    Returns statement to be added to comb/sync context."""
     shift = len(lhs) - len(rhs)
     if shift > 0:
         return lhs[shift:].eq(rhs)
@@ -17,6 +20,19 @@ def eqh(lhs, rhs):
         return lhs.eq(rhs[-shift:])
     else:
         return lhs.eq(rhs)
+
+
+def pipe(lhs, rhs, n):
+    """Assign rhs to lhs through n reset_less pipeline registers.
+    Returns list of statements to be added to sync context."""
+    assert n > 0
+    stmts = []
+    w = min(len(lhs), len(rhs))
+    for i in range(n - 1):
+        pip, rhs = rhs, Signal(n, reset_less=True)
+        stmts.append(rhs.eq(pip))
+    stmts.append(lhs.eq(rhs))
+    return stmts
 
 
 class ComplexMultiplier(Module):
@@ -43,10 +59,13 @@ class ComplexMultiplier(Module):
         if pwidth is None:
             # worst case min*min+min*min
             pwidth = awidth + bwidth + 1
-        self.a = complex(awidth)  # 5
-        self.b = complex(bwidth)  # 5
-        self.p = complex(pwidth)
+        self.a = Record(complex(awidth), reset_less=True)  # 5
+        self.b = Record(complex(bwidth), reset_less=True)  # 5
+        self.p = Record(complex(pwidth), reset_less=True)
 
+        # with rounding the worst case is assumed (!) to be max*max
+        # (unit circle interior: 2 bit smaller than full width worst
+        # case above)
         bias_bits = max(0, awidth + bwidth - pwidth - 1)
         bias = (1 << bias_bits - 1) - 1 if bias_bits > 0 else 0
 
@@ -137,7 +156,7 @@ class MCM(Module):
             ctx += o[8].eq(i << 3)
 
 
-class PhasedAccu(Accu):
+class PhasedAccu(Module):
     """Phase accumulator with multiple phased outputs.
 
     Output data (across cycles and outputs) is such
@@ -155,21 +174,92 @@ class PhasedAccu(Accu):
                   for _ in range(n)]
 
         self.submodules.mcm = MCM(fwidth, range(n))
-        q = [Signal(fwidth, reset_less=True) for _ in range(2)]
+        qa = Signal(fwidth)
+        qb = Signal(fwidth, reset_less=True)
         clr_d = Signal(reset_less=True)
         self.sync += [
             clr_d.eq(self.clr),
-            q[0].eq(q[0] + (self.f << log2_int(n))),
+            qa.eq(qa + (self.f << log2_int(n))),
             self.mcm.i.eq(self.f),
             If(self.clr | clr_d,
-                q[0].eq(0),
+                qa.eq(0),
             ),
             If(clr_d,
                 self.mcm.i.eq(0),
             ),
-            q[1].eq(q[0] + (self.p << fwidth - pwidth)),
-            [z.eq((q[1] + oi)[fwidth - pwidth:])
+            qb.eq(qa + (self.p << fwidth - pwidth)),
+            [z.eq((qb + oi)[fwidth - pwidth:])
                 for oi, z in zip(self.mcm.o, self.z)]
+        ]
+
+
+class MultiDDS(Accu):
+    """Time division multiplexed oscillator.
+
+    Uses one CosSinGen and one (complex-real) multiplier.
+    DDS parameter latencies are unmatched between parameters
+    and channels. Overflowing summation.
+    """
+    def __init__(self, n, fwidth, xwidth):
+        self.i = [Record([
+            ("f", fwidth), ("p", xwidth), ("a", xwidth - 1), ("clr", 1)])
+                  for i in range(n)]
+        self.o = Record(complex(xwidth), reset_less=True)
+        self.stb = Signal()
+        self.valid = Signal()
+
+        self.submodules.cs = CosSinGen()
+        self.submodules.mul = ComplexMultiplier(
+            awidth=len(self.cs.x), pwidth=len(self.cs.x))
+        # accu
+        accu = [Signal(fwidth) for _ in range(n)]
+        run = Signal()
+
+        i = Signal(max=n)
+        self._i = i
+        def cycle(offset):
+            return i == offset % n
+
+        for ii, ctrl in enumerate(self.i):
+            self.sync += [
+                If(run & cycle(ii),
+                    accu[ii].eq(accu[ii] + ctrl.f),
+                    If(ctrl.clr,
+                        accu[ii].eq(0)
+                    ),
+                ),
+                If(cycle(ii + 1),
+                    self.cs.z.eq((accu[ii] + (ctrl.p << fwidth - len(ctrl.p))
+                                  )[fwidth - len(self.cs.z):]),
+                ),
+                If(cycle(ii + 2 + self.cs.latency),
+                    self.mul.b.i.eq(ctrl.a),
+                ),
+            ]
+
+        # 4: q, z, mul.a, o
+        latency = self.cs.latency + self.mul.latency + 4 - 1
+
+        self.sync += [
+            self.mul.a.i.eq(self.cs.x),
+            self.mul.a.q.eq(self.cs.y),
+            If(run,
+                i.eq(i + 1),
+            ),
+            If(cycle(n - 1),
+                i.eq(0),
+                run.eq(0),
+            ),
+            If(self.stb,
+                run.eq(1),
+            ),
+            If(run,
+                self.o.i.eq(Mux(cycle(latency), 0, self.o.i) +
+                            self.mul.p.i),
+                self.o.q.eq(Mux(cycle(latency), 0, self.o.q) +
+                            self.mul.p.q),
+            ),
+            self.valid.eq(run & cycle(latency - 1)),
         ]
 
 
