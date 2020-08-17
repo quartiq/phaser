@@ -120,12 +120,12 @@ _ios = [
     ("adc", 0,
         Subsignal("sck_n", Pins("N22")),
         Subsignal("sck_p", Pins("M22")),
-        Subsignal("clkout_n", Pins("K19")),
-        Subsignal("clkout_p", Pins("K18")),
+        Subsignal("clkout_n", Pins("K19"), Misc("DIFF_TERM=TRUE")),
+        Subsignal("clkout_p", Pins("K18"), Misc("DIFF_TERM=TRUE")),
         Subsignal("cnvn_n", Pins("J22")),
         Subsignal("cnvn_p", Pins("H22")),
-        Subsignal("sdo_n", Pins("K22 M21")),
-        Subsignal("sdo_p", Pins("K21 L21")),
+        Subsignal("sdo_n", Pins("K22 M21"), Misc("DIFF_TERM=TRUE")),
+        Subsignal("sdo_p", Pins("K21 L21"), Misc("DIFF_TERM=TRUE")),
         IOStandard("LVDS_25")
     ),
 
@@ -261,7 +261,7 @@ _connectors = [
 
 
 _extensions = [
-    ("eem", i, IOStandard("LVDS_25")) + tuple([
+    ("eem", i, IOStandard("LVDS_25"), Misc("DIFF_TERM=TRUE")) + tuple([
         Subsignal("data{}_{}".format(j, p), Pins(
             "eem{}:d{}{}_{}".format(i, j, "_cc" if j == 0 else "", p)))
                 for j in range(8) for p in "pn"])
