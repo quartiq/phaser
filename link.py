@@ -9,17 +9,10 @@ class Link(Module):
         self.clk = Signal()  # link clock
         self.ld = Signal()  # load delay
         self.ce = Signal()  # inc delay
+        self.bitslip = Signal()
         self.cnt_out = Signal(5)
-        self.bitslip_req = Signal()
-        self.bitslip_done = Signal(reset_less=True)
         self.data = [Signal(4) for i in range(7)]
         self.out = Signal(4)
-
-        bitslip_pend = Signal(2, reset_less=True)
-        self.sync += [
-            Cat(bitslip_pend, self.bitslip_done).eq(
-                Cat(self.bitslip_req, bitslip_pend)),
-        ]
 
         cnt = Signal(5)
         self.comb += [
@@ -80,6 +73,25 @@ class Link(Module):
         ]
 
 
+class Slipper(Module):
+    def __init__(self, width):
+        self.data = Signal(width)
+        self.valid = Signal()
+        self.bitslip = Signal()
+
+        good = Signal()
+        pending = Signal(4, reset_less=True)
+        self.comb += [
+            good.eq(self.data == Replicate(self.data[0], width)),
+            self.bitslip.eq(pending[0]),
+        ]
+        self.sync += [
+            pending[0].eq((pending == 0) & ~good),
+            pending[1:].eq(pending),
+            self.valid.eq(good & (pending == 0)),
+        ]
+
+
 class Test(Module):
     def __init__(self, platform):
         eem = platform.request("eem", 0)
@@ -88,7 +100,6 @@ class Test(Module):
 
         if True:
             platform.add_period_constraint(eem.data0_p, 4.*8)
-            platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys.clk)
             platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
         else:
             # this needs to be late

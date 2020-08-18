@@ -7,10 +7,11 @@ from dac_data import DacData
 
 class Test(Module):
     def __init__(self, platform):
-        self.submodules.crg = CRG(platform)
         eem = platform.request("eem", 0)
-        # platform.add_period_constraint(eem.data0_p, 4.*8)
         self.submodules.link = Link(eem)
+        self.submodules.crg = CRG(platform)
+        platform.add_period_constraint(eem.data0_p, 4.*8)
+        platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
         self.submodules.data = DacData(platform.request("dac_data"))
         ins = []
         for i in range(2):
