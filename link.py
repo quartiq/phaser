@@ -86,7 +86,7 @@ class Slipper(Module):
         self.bitslip = Signal()
 
         good = Signal()
-        pending = Signal(4, reset_less=True)
+        pending = Signal(3, reset_less=True)
         self.comb += [
             # serdes sample match
             good.eq(self.data == Replicate(self.data[0], width)),
@@ -158,6 +158,7 @@ class Unframer(Module):
 
 
 class Checker(Module):
+    """Check CRC and assemble a frame"""
     def __init__(self, n_data, t_clk, n_frame):
         n_word = n_data*t_clk
         n_marker = n_frame//2 + 1
@@ -208,6 +209,11 @@ class Checker(Module):
 
 
 class Link(Module):
+    """Kasli-Phaser link implementation
+
+    * Like the Fastino link but with 8 bits per clock cycle
+    * 1 clock lane, 6 phaser input data lanes, 1 phaser output data lane
+    """
     def __init__(self, eem):
         self.submodules.phy = Phy(eem)
         n_serde = len(self.phy.data[0])
