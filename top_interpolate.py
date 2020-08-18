@@ -9,9 +9,10 @@ class Test(Module):
     def __init__(self, platform):
         eem = platform.request("eem", 0)
         self.submodules.link = Link(eem)
-        self.submodules.crg = CRG(platform)
+        self.submodules.crg = CRG(platform, link=self.link.phy.clk)
         platform.add_period_constraint(eem.data0_p, 4.*8)
         platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
+
         self.submodules.data = DacData(platform.request("dac_data"))
         ins = []
         for i in range(2):
@@ -24,8 +25,11 @@ class Test(Module):
                     self.data.data[2*j][i].eq(jo.i),
                     self.data.data[2*j + 1][i].eq(jo.q),
                 ]
-        self.sync += Cat(ins).eq(Cat(platform.request("test_point"), Cat(ins)))
-        self.sync += platform.request("user_led").eq(Cat(self.link.data) == 0)
+        self.sync += [
+            If(self.link.checker.frame_stb,
+                Cat(ins).eq(self.link.checker.frame)
+            )
+        ]
 
 
 if __name__ == "__main__":

@@ -114,7 +114,7 @@ class Accu(Module):
         self.p = Signal(pwidth)  # 1
         self.clr = Signal(reset=1)  # 2
         self.z = Signal(pwidth, reset_less=True)
-
+        # reset by clr
         q = Signal(fwidth, reset_less=True)
         self.sync += [
             q.eq(q + self.f),
@@ -180,7 +180,8 @@ class PhasedAccu(Module):
                   for _ in range(n)]
 
         self.submodules.mcm = MCM(fwidth, range(n))
-        qa = Signal(fwidth)
+        # reset by clr
+        qa = Signal(fwidth, reset_less=True)
         qb = Signal(fwidth, reset_less=True)
         clr_d = Signal(reset_less=True)
         self.sync += [

@@ -2,7 +2,7 @@ from migen import *
 from misoc.cores.liteeth_mini.mac.crc import LiteEthMACCRCEngine
 
 
-class Link(Module):
+class Phy(Module):
     def __init__(self, eem):
         mid = int(4e-9/4/78e-12/2)
 
@@ -76,9 +76,9 @@ class Link(Module):
 class Slipper(Module):
     """Bitslip controller.
 
-    Verifies `width - 1` equal bits per cycle.
-    If not, asserts bitslip and enforces latency.
-    Use bit index `(width - 1)//2` as data.
+    Verifies `width` equal bits per cycle.
+    If not, asserts bitslip and enforces latency blocking.
+    Use bit index `width//2` as data.
     """
     def __init__(self, width):
         self.data = Signal(width)
@@ -89,88 +89,146 @@ class Slipper(Module):
         pending = Signal(4, reset_less=True)
         self.comb += [
             # serdes sample match
-            good.eq(self.data[:-1] ==
-                    Replicate(self.data[0], width - 1)),
+            good.eq(self.data == Replicate(self.data[0], width)),
             self.bitslip.eq(pending[0]),
-        ]
-        self.sync += [
-            pending.eq(Cat((pending == 0) & ~good, pending)),
             # match and slip done
             self.valid.eq(good & (pending == 0)),
+        ]
+        self.sync += [
+            pending.eq(Cat(~good & (pending == 0), pending)),
         ]
 
 
 class Unframer(Module):
-    """Unframes the clk, marker, and data bit streams into frames consisting of
-    multiple payload chunks and one metadata chunk.
+    """Unframes the clk, marker, and data bit streams into a framed multibit
+    stream
 
     * `n_data`: number of clk+data lanes
     * `t_clk` is the clock pattern length
     * `n_frame` clock cycles per frame
-    * `n_payload` bits per payload
-    * `n_meta` metadata bits per frame
     """
-    def __init__(self, n_data, t_clk, n_frame, n_payload, n_meta):
+    def __init__(self, n_data, t_clk, n_frame):
         n_marker = n_frame//2 + 1
         n_frame_total = n_frame*t_clk*(n_data - 1)
-        n_words, n_rest = divmod(n_frame_total - n_marker - n_meta, n_payload)
-        assert n_rest == 0
-        n_offset, n_rest = divmod(n_marker + n_meta, n_words)
-        assert n_rest == 0
-        t_payload, n_rest = divmod(n_frame*t_clk, n_words)
-        assert n_rest == 0
-        n_meta_in_marker = n_frame - n_marker
 
         # clock and data inputs
         self.data = Signal(n_data)
+        self.valid = Signal()
         # paybload data output
-        self.payload = Signal(n_payload, reset_less=True)
+        self.payload = Signal(n_data - 1, reset_less=True)
         self.payload_stb = Signal()
-        # metadata output
-        self.meta = Signal(n_meta, reset_less=True)
-        self.meta_stb = Signal()
+        # indicates first payload bit is marker
+        self.payload_short = Signal(reset_less=True)
+        self.end_of_frame = Signal(reset_less=True)
         # response bitstream
         self.out = Signal(reset_less=True)
-        # response data
+        # response data, latched on end_of_frame
         self.response = Signal(n_frame)
 
         clk_sr = Signal(t_clk - 1, reset_less=True)
         clk_stb = Signal()
-        marker_sr = Signal(n_frame - 1, reset_less=True)
+        marker_sr = Signal(n_marker - 1, reset_less=True)
         marker_stb = Signal()
-        meta_sr = Signal(n_meta - n_meta_in_marker, reset_less=True)
-        assert len(self.meta) == len(meta_sr) + len(marker_sr) - (n_marker - 1)
-        i_payload = Signal(max=t_payload)
-        i_payload_stb = Signal()
         response_sr = Signal(n_frame, reset_less=True)
 
         self.comb += [
             # clock pattern match (00001111)
             clk_stb.eq(Cat(self.data[0], clk_sr) == (1 << t_clk//2) - 1),
             # marker pattern match (000001)
-            marker_stb.eq(clk_stb & (
-                Cat(self.data[1], marker_sr[:n_marker - 1]) == 1)),
-            self.meta.eq(Cat(marker_sr[n_marker - 1:], meta_sr)),
-            i_payload_stb.eq(i_payload == t_payload - 1),
+            marker_stb.eq(Cat(self.data[1], marker_sr) == 1),
             self.out.eq(response_sr[-1]),
         ]
         self.sync += [
             clk_sr.eq(Cat(self.data[0], clk_sr)),
             If(clk_stb,
                 marker_sr.eq(Cat(self.data[1], marker_sr)),
+                response_sr[1:].eq(response_sr),
             ),
-            i_payload.eq(i_payload + 1),
-            If(i_payload_stb | marker_stb,
-                i_payload.eq(0),
-            ),
-            response_sr[1:].eq(response_sr),
-            If(self.meta_stb,
+            # If(~self.valid,
+            #     clk_sr.eq(~((1 << t_clk//2) - 1)),
+            #     marker_sr.eq(~1),
+            # ),
+            self.payload_stb.eq(self.valid),
+            self.payload.eq(self.data[1:]),
+            self.end_of_frame.eq(clk_stb & marker_stb),
+            If(self.end_of_frame,
                 response_sr.eq(self.response),
             ),
-            self.payload.eq(Cat(self.data[1 + n_offset:], self.payload)),
-            self.payload_stb.eq(i_payload_stb),
-            meta_sr.eq(Cat(self.data[2:1 + n_offset], self.meta)),
-            self.meta_stb.eq(marker_stb),
+        ]
+
+
+class Checker(Module):
+    def __init__(self, n_data, t_clk, n_frame):
+        n_word = n_data*t_clk
+        n_marker = n_frame//2 + 1
+
+        self.data = Signal(n_data)
+        self.data_stb = Signal()
+        self.end_of_frame = Signal()
+        self.frame = Signal(n_word*n_frame - n_marker)
+        self.frame_stb = Signal()
+        self.crc_err = Signal(8)
+
+        poly = {
+            6: 0x2f,  # crc-6-gsm
+        }[n_data]
+        self.submodules.crc = LiteEthMACCRCEngine(
+            data_width=n_data, width=n_data, polynom=poly)
+        self.crc.last.reset_less = True
+        crc_good = Signal()
+        crc = Signal.like(self.crc.last, reset_less=True)
+        self.comb += [
+            crc_good.eq(self.crc.next == 0),
+            # LiteEthMACCRCEngine takes LSB first
+            self.crc.data.eq(self.data[::-1]),
+        ]
+        self.sync += [
+            self.crc.last.eq(self.crc.next),
+            If(self.end_of_frame | ~self.data_stb,
+                self.crc.last.eq(0),
+                If(~crc_good,
+                    self.crc_err.eq(self.crc_err + 1),
+                ),
+            ),
+        ]
+
+        frame_buf = Signal(n_word*n_frame, reset_less=True)
+        self.sync += [
+            frame_buf.eq(Cat(self.data, frame_buf)),
+            self.frame_stb.eq(self.end_of_frame & crc_good & self.data_stb),
+        ]
+
+        frame_parts = []
+        for i in range(n_frame):
+            frame_parts.append(frame_buf[
+                i*n_word + (0 if i < n_frame - n_marker else 1):
+                (i + 1)*n_word])
+        assert len(Cat(frame_parts)) == len(self.frame)
+        self.comb += self.frame.eq(Cat(frame_parts))
+
+
+class Link(Module):
+    def __init__(self, eem):
+        self.submodules.phy = Phy(eem)
+        n_serde = len(self.phy.data[0])
+        self.submodules.slip = Slipper(n_serde - 1)
+        self.comb += [
+            self.slip.data.eq(self.phy.data[0]),  # clk
+            self.phy.bitslip.eq(self.slip.bitslip),
+        ]
+        self.submodules.unframe = Unframer(
+            n_data=7, n_frame=10, t_clk=8)
+        self.comb += [
+            self.unframe.valid.eq(self.slip.valid),
+            [self.unframe.data[i].eq(self.phy.data[i][n_serde//2 - 1])
+             for i in range(len(self.phy.data))],
+            self.phy.out.eq(Replicate(self.unframe.out, n_serde)),
+        ]
+        self.submodules.checker = Checker(n_data=6, n_frame=10, t_clk=8)
+        self.comb += [
+            self.checker.data.eq(self.unframe.payload),
+            self.checker.data_stb.eq(self.unframe.payload_stb),
+            self.checker.end_of_frame.eq(self.unframe.end_of_frame),
         ]
 
 
@@ -178,7 +236,7 @@ class Test(Module):
     def __init__(self, platform):
         eem = platform.request("eem", 0)
         self.submodules.link = Link(eem)
-        self.submodules.crg = CRG(platform, link=self.link.clk)
+        self.submodules.crg = CRG(platform, link=self.link.phy.clk)
 
         if True:
             platform.add_period_constraint(eem.data0_p, 4.*8)
@@ -201,23 +259,8 @@ class Test(Module):
             "-file {build_name}_timing_in.rpt",
         ])
 
-        n_serde = len(self.link.data[0])
-        self.submodules.slip = Slipper(n_serde)
-        self.comb += [
-            self.slip.data.eq(self.link.data[0]),  # clk
-            self.link.bitslip.eq(self.slip.bitslip),
-        ]
-        self.submodules.unframe = Unframer(
-            n_data=7, n_frame=10, t_clk=8, n_payload=2*14,
-            n_meta=6 + 1 + 9 + 8 + 2)
-        self.comb += [
-            # self.unframe.slip_valid.eq(self.slip.valid)
-            [i.eq(o[n_serde//2 - 1]) for i, o in zip(self.unframe.data, self.link.data)],
-            self.link.out.eq(Replicate(self.unframe.out, n_serde)),
-        ]
-
-        self.sync += platform.request("user_led").eq(Cat(self.unframe.payload,
-            self.unframe.meta) == 0)
+        self.sync += platform.request("user_led").eq(Cat(self.link.checker.frame,
+            self.link.checker.frame_stb) == 0)
 
 
 if __name__ == "__main__":
