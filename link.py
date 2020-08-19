@@ -117,8 +117,6 @@ class Unframer(Module):
         # paybload data output
         self.payload = Signal(n_data - 1, reset_less=True)
         self.payload_stb = Signal()
-        # indicates first payload bit is marker
-        self.payload_short = Signal(reset_less=True)
         self.end_of_frame = Signal(reset_less=True)
         # response bitstream
         self.out = Signal(reset_less=True)

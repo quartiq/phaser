@@ -19,8 +19,41 @@ class Phaser(Module):
             self.decoder.frame.eq(self.link.checker.frame),
             self.decoder.stb.eq(self.link.checker.frame_stb),
         ]
+
+        self.comb += [
+            self.decoder.get("hw_rev", "read").eq(Cat(
+                platform.request("hw_variant"),
+                platform.request("hw_rev"))),
+            self.decoder.get("gw_rev", "read").eq(0x01),
+            Cat([platform.request("user_led", i) for i in range(6)]).eq(
+                self.decoder.get("led", "write")),
+            platform.request("clk_sel").eq(self.decoder.get("clk", "write")),
+            platform.request("dac_ctrl").raw_bits().eq(
+                self.decoder.get("dac", "write")),
+            Cat([platform.request("att_rstn", i)
+                for i in range(2)]).eq(self.decoder.get("att", "write")),
+            Cat([platform.request("trf_ctrl", i).raw_bits()
+                for i in range(2)]).eq(self.decoder.get("trf", "write")),
+            platform.request("adc_ctrl").raw_bits().eq(
+                self.decoder.get("adc", "write")),
+        ]
+
+        fan_cnt = Signal(8, reset_less=True)
+        fan = platform.request("fan_pwm")
+        fan.reset_less = True
         self.sync += [
-            self.decoder.registers["duc"][0].write[:4].eq(0),  # up, clr
+            fan_cnt.eq(fan_cnt + 1),
+            If(fan_cnt == 0,
+                fan.eq(1),
+            ),
+            If(fan_cnt == self.decoder.get("fan", "read"),
+                fan.eq(0),
+            ),
+        ]
+
+        self.sync += [
+            # this ends up before the bus write, last takes precedence
+            self.decoder.registers["duc"][0].write[:4].eq(0),  # autoclear: up, clr
         ]
         self.submodules.data = DacData(platform.request("dac_data"))
         self.comb += [
@@ -36,8 +69,8 @@ class Phaser(Module):
             ]
             self.sync += [
                 If(self.decoder.registers["duc"][0].write[i],
-                    duc.f.eq(self.decoder.get_write("duc{}_f".format(i))),
-                    duc.p.eq(self.decoder.get_write("duc{}_p".format(i))),
+                    duc.f.eq(self.decoder.get("duc{}_f".format(i), "write")),
+                    duc.p.eq(self.decoder.get("duc{}_p".format(i), "write")),
                 ),
             ]
             for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
@@ -46,6 +79,16 @@ class Phaser(Module):
                     self.data.data[2*j + 1][i].eq(jo.q),
                 ]
 
+        self.comb += [
+            Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
+                self.link.phy.clk,
+                ResetSignal(),
+                self.link.slip.valid,
+                self.link.unframe.end_of_frame,
+                self.link.checker.frame_stb,
+                self.decoder.zoh.sample_mark)
+            )
+        ]
 
 if __name__ == "__main__":
     from phaser import Platform

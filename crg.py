@@ -26,8 +26,6 @@ class CRG(Module):
         self.clock_domains.cd_sys2 = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys2q = ClockDomain(reset_less=True)
 
-        self.comb += platform.request("clk_sel").eq(0)  # mmcx internal
-
         clk125 = platform.request("clk125_gtp")
         platform.add_period_constraint(clk125, 8.)
         self.clk125 = Signal()

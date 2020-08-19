@@ -145,14 +145,14 @@ class Decode(Module):
             (0x00,),
             ("hw_rev", Register(write=False)),
             ("gw_rev", Register(write=False)),
-            ("clk", Register()),
-            ("led", Register()),
+            ("clk", Register(width=1)),
+            ("led", Register(width=6)),
             ("fan", Register()),
-            ("att", Register()),
-            ("trf", Register()),
-            ("adc", Register()),
-            ("dac", Register()),
-            ("duc", Register()),
+            ("att", Register(width=2)),
+            ("trf", Register(width=4)),
+            ("adc", Register(width=6)),
+            ("dac", Register(width=4)),
+            ("duc", Register(width=4)),
             ("adc0_dat", Register(write=False), Register(write=False)),
             ("adc1_dat", Register(write=False), Register(write=False)),
             (0x10,),
@@ -188,8 +188,8 @@ class Decode(Module):
                 self.submodules += reg
                 addr += 1
 
-    def get_read(self, name):
-        return Cat([reg.read for reg in self.registers[name]])
-
-    def get_write(self, name):
-        return Cat([reg.write for reg in self.registers[name]])
+    def get(self, name, attr):
+        regs = self.registers[name]
+        if len(regs) == 1:
+            return getattr(regs[0], attr)
+        return Cat([getattr(reg, attr) for reg in regs])
