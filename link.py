@@ -125,9 +125,10 @@ class Unframer(Module):
         # response data, latched on end_of_frame
         self.response = Signal(n_frame)
 
-        clk_sr = Signal(t_clk - 1, reset_less=True)
+        clk_sr = Signal(t_clk - 1, reset_less=True,
+                        reset=~((1 << t_clk//2) - 1))
         clk_stb = Signal()
-        marker_sr = Signal(n_marker - 1, reset_less=True)
+        marker_sr = Signal(n_marker, reset_less=True, reset=~1)
         marker_stb = Signal()
         response_sr = Signal(n_frame, reset_less=True)
 
@@ -135,7 +136,7 @@ class Unframer(Module):
             # clock pattern match (00001111)
             clk_stb.eq(Cat(self.data[0], clk_sr) == (1 << t_clk//2) - 1),
             # marker pattern match (000001)
-            marker_stb.eq(Cat(self.data[1], marker_sr) == 1),
+            marker_stb.eq(marker_sr == 1),
             self.out.eq(response_sr[-1]),
         ]
         self.sync += [
@@ -144,10 +145,10 @@ class Unframer(Module):
                 marker_sr.eq(Cat(self.data[1], marker_sr)),
                 response_sr[1:].eq(response_sr),
             ),
-            # If(~self.valid,
-            #     clk_sr.eq(~((1 << t_clk//2) - 1)),
-            #     marker_sr.eq(~1),
-            # ),
+            #If(~self.valid,
+            #    clk_sr.eq(clk_sr.reset),
+            #    marker_sr.eq(marker_sr.reset),
+            #),
             self.payload_stb.eq(self.valid),
             self.payload.eq(self.data[1:]),
             self.end_of_frame.eq(clk_stb & marker_stb),
@@ -162,16 +163,18 @@ class Checker(Module):
     def __init__(self, n_data, t_clk, n_frame):
         n_word = n_data*t_clk
         n_marker = n_frame//2 + 1
+        n_crc = n_data
 
         self.data = Signal(n_data)
         self.data_stb = Signal()
         self.end_of_frame = Signal()
-        self.frame = Signal(n_word*n_frame - n_marker)
+        self.frame = Signal(n_word*n_frame - n_marker - n_crc)
         self.frame_stb = Signal()
         self.crc_err = Signal(8)
 
         poly = {
-            6: 0x2f,  # crc-6-gsm
+            # 6: 0x27,  # CRC-6-CDMA2000-A
+            6: 0x2f,  # CRC-6-GSM
         }[n_data]
         self.submodules.crc = LiteEthMACCRCEngine(
             data_width=n_data, width=n_data, polynom=poly)
@@ -180,6 +183,7 @@ class Checker(Module):
         crc = Signal.like(self.crc.last, reset_less=True)
         self.comb += [
             crc_good.eq(self.crc.next == 0),
+            # crc_good.eq(1),  # TODO
             # LiteEthMACCRCEngine takes LSB first
             self.crc.data.eq(self.data[::-1]),
         ]
@@ -201,9 +205,13 @@ class Checker(Module):
 
         frame_parts = []
         for i in range(n_frame):
-            frame_parts.append(frame_buf[
-                i*n_word + (0 if i < n_frame - n_marker else 1):
-                (i + 1)*n_word])
+            if i == 0:
+                offset = n_crc
+            elif i < n_marker + 1:
+                offset = 1
+            else:
+                offset = 0
+            frame_parts.append(frame_buf[i*n_word + offset: (i + 1)*n_word])
         assert len(Cat(frame_parts)) == len(self.frame)
         self.comb += self.frame.eq(Cat(frame_parts))
 
