@@ -45,7 +45,6 @@ class DacData(Module):
         # external read pointer reset, to dac_clk*interpolation, not needed
         # self._oserdes([0, 0, 0, 0], pins.ostr_p, pins.ostr_n)
 
-        # A0:C0, B0:D0, A1:C1, B1:D1
         for i, port in enumerate([
                 (pins.data_a_p, pins.data_a_n),
                 (pins.data_b_p, pins.data_b_n)]):

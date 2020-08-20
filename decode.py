@@ -14,17 +14,25 @@ header_layout = [
 
 
 class SampleMux(Module):
-    def __init__(self, n_sample, n_channel, n_mux, n_frame):
-        self.body = Signal(n_sample*2*n_channel*n_mux)
+    """Zero order hold interpolator.
+
+    * `b_sample`: bits per sample (i or q)
+    * `n_mux`: iq samples per channel in body
+    * `n_channel`: iq dac channels
+    * `n_mux`: sample repetitions (interpolation)
+    * `t_frame`: clock cycles per frame
+    """
+    def __init__(self, b_sample, n_channel, n_mux, t_frame):
+        self.body = Signal(b_sample*2*n_channel*n_mux)
         self.body_stb = Signal()
-        self.sample = [Record(complex(n_sample)) for _ in range(n_channel)]
+        self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
         self.sample_stb = Signal()
         self.sample_mark = Signal()
-        samples = [Signal(n_channel*2*n_sample, reset_less=True) for _ in range(n_mux)]
+        samples = [Signal(n_channel*2*b_sample, reset_less=True) for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
         i = Signal(max=n_mux, reset_less=True)
-        assert n_frame % n_mux == 0
-        j = Signal(max=n_frame//n_mux, reset_less=True)
+        assert t_frame % n_mux == 0
+        j = Signal(max=t_frame//n_mux, reset_less=True)
         self.comb += [
             Cat([_.raw_bits() for _ in self.sample]).eq(Array(samples)[i]),
         ]
@@ -32,7 +40,7 @@ class SampleMux(Module):
             self.sample_mark.eq(self.body_stb),
             j.eq(j + 1),
             self.sample_stb.eq(0),
-            If(j == n_frame//n_mux - 1,
+            If(j == t_frame//n_mux - 1,
                 j.eq(0),
                 i.eq(i + 1),
                 self.sample_stb.eq(1),
@@ -56,7 +64,8 @@ bus_layout = [
 
 
 class Register(Module):
-    def __init__(self, width=None, read=True, write=True, store=True):
+    """Configuration/status register"""
+    def __init__(self, width=None, read=True, write=True, readback=True):
         self.bus = Record(bus_layout)
         if width is None:
             width = len(self.bus.dat_w)
@@ -67,7 +76,7 @@ class Register(Module):
         if read:
             self.read = Signal(width)
             self.comb += self.bus.dat_r.eq(self.read)
-        if read and write and store:
+        if read and write and readback:
             self.comb += self.read.eq(self.write)
 
 
@@ -114,10 +123,10 @@ ext_layout = [
 
 
 class Decode(Module):
-    def __init__(self, n_sample, n_channel, n_mux, n_frame):
+    def __init__(self, b_sample, n_channel, n_mux, t_frame):
         n_samples = n_mux*n_channel*2
         header = Record(header_layout)
-        body = Signal(n_samples*n_sample)
+        body = Signal(n_samples*b_sample)
         self.frame = Signal(len(body) + len(header))
         self.stb = Signal()
         self.response = Signal(8, reset_less=True)
@@ -126,8 +135,8 @@ class Decode(Module):
         ]
 
         self.submodules.zoh = SampleMux(
-            n_sample=n_sample, n_channel=n_channel, n_mux=n_mux,
-            n_frame=n_frame)
+            b_sample=b_sample, n_channel=n_channel, n_mux=n_mux,
+            t_frame=t_frame)
         self.comb += [
             self.zoh.body.eq(body),
             self.zoh.body_stb.eq(self.stb),
@@ -141,38 +150,8 @@ class Decode(Module):
             self.bus.bus.re.eq(~header.we & self.stb),
             self.response.eq(self.bus.bus.dat_r),
         ]
-        registers = [
-            (0x00,),
-            ("hw_rev", Register(write=False)),
-            ("gw_rev", Register(write=False)),
-            ("clk", Register(width=1)),
-            ("led", Register(width=6)),
-            ("fan", Register()),
-            ("att", Register(width=2)),
-            ("trf", Register(width=4)),
-            ("adc", Register(width=6)),
-            ("dac", Register(width=4)),
-            ("duc", Register(width=4)),
-            ("adc0_dat", Register(write=False), Register(write=False)),
-            ("adc1_dat", Register(write=False), Register(write=False)),
-            (0x10,),
-            ("spi_cfg", Register(), Register()),
-            ("spi_sel", Register()),
-            ("spi_datw", Register(read=False), Register(read=False),
-                         Register(read=False), Register(read=False)),
-            ("spi_datr", Register(write=False), Register(write=False),
-                         Register(write=False), Register(write=False)),
-            (0x20,),
-            ("duc0_f", Register(), Register(), Register(), Register()),
-            ("duc0_p", Register(), Register()),
-            ("duc0_data", Register(write=False), Register(write=False)),
-            ("dac0_test", Register(read=False), Register(read=False)),
-            (0x30,),
-            ("duc1_f", Register(), Register(), Register(), Register()),
-            ("duc1_p", Register(), Register()),
-            ("duc1_data", Register(write=False), Register(write=False)),
-            ("dac1_test", Register(read=False), Register(read=False)),
-        ]
+
+    def map_registers(self, registers):
         self.mem_map = {}
         self.registers = {}
         addr = 0
@@ -180,6 +159,7 @@ class Decode(Module):
             if isinstance(name, int):
                 addr = name
                 continue
+            assert name not in self.registers
             self.registers[name] = regs
             for i, reg in enumerate(regs):
                 self.bus.connect(reg.bus, addr, mask=0x7f)
