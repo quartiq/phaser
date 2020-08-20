@@ -28,6 +28,7 @@ class Phy(Module):
             dly = Signal()
             self.specials += [
                 Instance("IBUFGDS" if i == 0 else "IBUFDS",
+                    attr={("DIFF_TERM", "TRUE")},
                     i_I=getattr(eem, "data{}_p".format(i)),
                     i_IB=getattr(eem, "data{}_n".format(i)),
                     o_O=buf),

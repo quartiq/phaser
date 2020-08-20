@@ -261,7 +261,7 @@ _connectors = [
 
 
 _extensions = [
-    ("eem", i, IOStandard("LVDS_25"), Misc("DIFF_TERM=TRUE")) + tuple([
+    ("eem", i, IOStandard("LVDS_25")) + tuple([
         Subsignal("data{}_{}".format(j, p), Pins(
             "eem{}:d{}{}_{}".format(i, j, "_cc" if j == 0 else "", p)))
                 for j in range(8) for p in "pn"])
@@ -291,7 +291,7 @@ class Platform(XilinxPlatform):
             "set_property CFGBVS VCCO [current_design]",
             "set_property CONFIG_VOLTAGE 2.5 [current_design]",
         ])
-        if load:
+        if load or flash:
             self.toolchain.additional_commands.extend([
                 "open_hw_manager",
                 "connect_hw_server",
