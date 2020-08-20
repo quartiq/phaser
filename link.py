@@ -125,7 +125,7 @@ class Unframer(Module):
         self.response = Signal(n_frame)
 
         clk_sr = Signal(t_clk - 1, reset_less=True,
-                        reset=((1 << t_clk//2) - 1) << (t_clk//2))
+                        reset=((1 << t_clk//2) - 1) << (t_clk//2 - 1))
         clk_stb = Signal()
         marker_sr = Signal(n_marker, reset_less=True,
                            reset=((1 << n_marker - 1) - 1) << 1)

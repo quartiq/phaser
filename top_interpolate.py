@@ -81,7 +81,7 @@ class Phaser(Module):
         att_rstn = [platform.request("att_rstn") for _ in range(2)]
         adc_ctrl = platform.request("adc_ctrl")
         self.comb += [
-            self.decoder.get("id", "read").eq(0xd9),
+            self.decoder.get("id", "read").eq(19),  # Sinara.boards.index("Phaser")
             self.decoder.get("hw_rev", "read").eq(Cat(
                 platform.request("hw_rev"), platform.request("hw_variant"))),
             self.decoder.get("gw_rev", "read").eq(0x01),
@@ -90,11 +90,11 @@ class Phaser(Module):
             Cat(platform.request("clk_sel"), dac_ctrl.resetb, dac_ctrl.sleep,
                 dac_ctrl.txena, trf_ctrl[0].ps, trf_ctrl[1].ps,
                 att_rstn[0], att_rstn[1]).eq(self.decoder.get("cfg", "write")),
-            Cat(adc_ctrl.gain0, adc_ctrl.gain1).eq(
-                self.decoder.get("adc_cfg", "write")),
             self.decoder.get("sta", "read")[:6].eq(Cat(
                 dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
-                adc_ctrl.term_stat)),
+                adc_ctrl.term_stat)),  # 6, 7 for spi machine
+            Cat(adc_ctrl.gain0, adc_ctrl.gain1).eq(
+                self.decoder.get("adc_cfg", "write")),
         ]
 
         fan = platform.request("fan_pwm")
