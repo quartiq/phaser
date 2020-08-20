@@ -139,7 +139,7 @@ _ios = [
         Subsignal("clk", Pins("U3")),
         Subsignal("miso", Pins("V9")),  # RDBK
         Subsignal("mosi", Pins("T3")),  # DATA
-        Subsignal("cs_n", Pins("Y9")),  # LE
+        Subsignal("cs_n", Pins("T1")),  # LE
         IOStandard("LVCMOS33")
     ),
 

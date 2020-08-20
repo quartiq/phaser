@@ -1,4 +1,6 @@
 from migen import *
+from misoc.cores.spi2 import SPIMachine, SPIInterface
+
 from crg import CRG
 from link import Link
 from decode import Decode, Register
@@ -50,8 +52,10 @@ class Phaser(Module):
             # ("adc0_dat", Register(write=False), Register(write=False)),
             # ("adc1_dat", Register(write=False), Register(write=False)),
             (0x10,),
-            ("spi_cfg", Register(), Register()),
+            ("spi_cfg", Register()),
+            ("spi_div", Register()),
             ("spi_sel", Register()),
+            ("spi_len", Register()),
             ("spi_datw", Register(read=False), Register(read=False),
                          Register(read=False), Register(read=False)),
             ("spi_datr", Register(write=False), Register(write=False),
@@ -88,15 +92,49 @@ class Phaser(Module):
                 att_rstn[0], att_rstn[1]).eq(self.decoder.get("cfg", "write")),
             Cat(adc_ctrl.gain0, adc_ctrl.gain1).eq(
                 self.decoder.get("adc_cfg", "write")),
-            self.decoder.get("sta", "read").eq(Cat(
-                dac_ctrl.alarm,
-                trf_ctrl[0].ld, trf_ctrl[1].ld, adc_ctrl.term_stat)),
+            self.decoder.get("sta", "read")[:6].eq(Cat(
+                dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
+                adc_ctrl.term_stat)),
         ]
 
         fan = platform.request("fan_pwm")
         fan.reset_less = True
         self.submodules.fan = PWM(fan)
         self.comb += self.fan.duty[-8:].eq(self.decoder.get("fan", "write"))
+
+        self.submodules.spiint = SPIInterface(
+            platform.request("dac_spi"),
+            platform.request("trf_spi", 0),
+            platform.request("trf_spi", 1),
+            platform.request("att_spi", 0),
+            platform.request("att_spi", 1),
+        )
+        self.submodules.spi = SPIMachine()
+        self.comb += [
+            self.decoder.get("sta", "read")[6:].eq(Cat(
+                self.spi.idle, self.spi.writable)),
+            self.spi.reg.pdo.eq(self.decoder.get("spi_datw", "write")),
+            self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
+            # self.spi.readable, self.spi.writable, self.spi.idle,
+            self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
+            self.spiint.cs_polarity.eq(0),  # all active low
+            self.spi.length.eq(self.decoder.get("spi_len", "write")),
+            self.spi.cg.div.eq(self.decoder.get("spi_div", "write")),
+            Cat(self.spiint.offline, self.spi.end,
+                self.spi.clk_phase, self.spiint.clk_polarity,
+                self.spiint.half_duplex, self.spi.reg.lsb_first).eq(
+                    self.decoder.get("spi_cfg", "write")),
+            self.spiint.cs_next.eq(self.spi.cs_next),
+            self.spiint.clk_next.eq(self.spi.clk_next),
+            self.spiint.ce.eq(self.spi.ce),
+            self.spiint.sample.eq(self.spi.reg.sample),
+            self.spi.reg.sdi.eq(self.spiint.sdi),
+            self.spiint.sdo.eq(self.spi.reg.sdo),
+        ]
+        self.sync += [
+            # load on MSB write
+            self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
+        ]
 
         self.submodules.data = DacData(platform.request("dac_data"))
         self.comb += [
@@ -151,6 +189,7 @@ class Phaser(Module):
                 self.data.data_sync)
             )
         ]
+
 
 if __name__ == "__main__":
     from phaser import Platform
