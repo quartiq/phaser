@@ -297,10 +297,7 @@ class Platform(XilinxPlatform):
                 "connect_hw_server",
                 "open_hw_target",
                 "current_hw_device [lindex [get_hw_devices] 0]",
-                # "set_property PROGRAM.FILE {{{build_name}.bit}} "
-                #    "[current_hw_device]",
-                # "program_hw_devices",
-                # "refresh_hw_device",
+            ] + ([
                 "write_cfgmem -force -format MCS -size 8 -interface SPIx4 "
                     "-loadbit \"up 0x0 {build_name}.bit\" {build_name}",
                 "create_hw_cfgmem -hw_device [current_hw_device] "
@@ -321,10 +318,13 @@ class Platform(XilinxPlatform):
                     "[get_property PROGRAM.HW_CFGMEM_BITFILE "
                     "[current_hw_device]]",
                 "program_hw_devices",
-            ] + ([
-                    "program_hw_cfgmem",
-                    "boot_hw_device -verbose [current_hw_device]"
+                "program_hw_cfgmem",
+                "boot_hw_device -verbose [current_hw_device]"
             ] if flash else [
+                "set_property PROGRAM.FILE {{{build_name}.bit}} "
+                   "[current_hw_device]",
+                "program_hw_devices",
+                # "refresh_hw_device",
             ]) + [
                 "close_hw_target",
                 "close_hw_manager"
