@@ -62,12 +62,11 @@ class Phy(Module):
             Instance("OSERDESE2",
                 p_DATA_RATE_OQ="DDR", p_DATA_RATE_TQ="BUF",
                 p_DATA_WIDTH=4, p_TRISTATE_WIDTH=1,
-                p_INIT_OQ=0b00000000,
                 i_RST=ResetSignal(),
                 i_CLK=ClockSignal("sys2"),
                 i_CLKDIV=ClockSignal(),
-                # MSB first, D1 is closest to Q
-                i_D1=data[3], i_D2=data[2], i_D3=data[1], i_D4=data[0],
+                # LSB first, D1 is closest to Q
+                i_D1=data[0], i_D2=data[1], i_D3=data[2], i_D4=data[3],
                 i_TCE=1, i_OCE=1, i_T1=0,
                 o_OQ=pin),
             Instance("OBUFDS", i_I=pin, o_O=eem.data7_p, o_OB=eem.data7_n)
@@ -249,32 +248,36 @@ class Link(Module):
 class Test(Module):
     def __init__(self, platform):
         eem = platform.request("eem", 0)
+        platform.add_period_constraint(eem.data0_p, 4.*8)
         self.submodules.link = Link(eem)
         self.submodules.crg = CRG(platform, link=self.link.phy.clk)
 
         if True:
-            platform.add_period_constraint(eem.data0_p, 4.*8)
-            platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
+            platform.add_false_path_constraint(
+                eem.data0_p, self.crg.cd_sys2.clk)
         else:
-            # this needs to be late
-            platform.add_platform_command(
-                    "create_clock -name {clk} -period 32.0 [get_ports {clk}]",
-                    clk=eem.data0_p)
             for i in range(1, 7):
                 pin = getattr(eem, "data{}_p".format(i))
                 platform.add_platform_command(
-                    "set_input_delay -0.25 -min -clock [get_clocks {clk}] "
-                    "[get_ports {pin}]", clk=eem.data0_p, pin=pin)
+                    "set_input_delay -0.25 -min -clock "
+                    "[get_generated_clocks sys2] [get_ports {pin}]", pin=pin)
                 platform.add_platform_command(
-                    "set_input_delay 0.25 -max -clock [get_clocks {clk}] "
-                    "[get_ports {pin}]", clk=eem.data0_p, pin=pin)
+                    "set_input_delay 0.25 -max -clock "
+                    "[get_generated_clocks sys2] [get_ports {pin}]", pin=pin)
+                platform.add_platform_command(
+                    "set_input_delay -0.25 -min -add_delay -clock_fall -clock "
+                    "[get_generated_clocks sys2] [get_ports {pin}]", pin=pin)
+                platform.add_platform_command(
+                    "set_input_delay 0.25 -max -add_delay -clock_fall -clock "
+                    "[get_generated_clocks sys2] [get_ports {pin}]", pin=pin)
+
         platform.toolchain.additional_commands.extend([
             "report_timing -nworst 20 -setup -hold -from [get_ports] "
             "-file {build_name}_timing_in.rpt",
         ])
 
-        self.sync += platform.request("user_led").eq(Cat(self.link.checker.frame,
-            self.link.checker.frame_stb) == 0)
+        self.sync += platform.request("user_led").eq(Cat(
+            self.link.checker.frame, self.link.checker.frame_stb) == 0)
 
 
 if __name__ == "__main__":

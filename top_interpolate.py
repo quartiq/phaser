@@ -49,25 +49,19 @@ class Phaser(Module):
             ("duc_cfg", Register()),
             ("duc_stb", Register(write=False, read=False)),
             ("adc_cfg", Register(width=4)),
-            # ("adc0_dat", Register(write=False), Register(write=False)),
-            # ("adc1_dat", Register(write=False), Register(write=False)),
-            (0x10,),
             ("spi_cfg", Register()),
             ("spi_div", Register()),
             ("spi_sel", Register()),
-            ("spi_len", Register()),
-            ("spi_datw", Register(read=False), Register(read=False),
-                         Register(read=False), Register(read=False)),
-            ("spi_datr", Register(write=False), Register(write=False),
-                         Register(write=False), Register(write=False)),
-            (0x20,),
+            ("spi_datw", Register(read=False)),
+            ("spi_datr", Register(write=False)),
+            (0x10,),
             ("duc0_f", Register(), Register(), Register(), Register()),
             ("duc0_p", Register(), Register()),
             ("dac0_data", Register(write=False), Register(write=False),
                           Register(write=False), Register(write=False)),
             ("dac0_test", Register(read=False), Register(read=False),
                           Register(read=False), Register(read=False)),
-            (0x30,),
+            (0x20,),
             ("duc1_f", Register(), Register(), Register(), Register()),
             ("duc1_p", Register(), Register()),
             ("dac1_data", Register(write=False), Register(write=False),
@@ -109,7 +103,7 @@ class Phaser(Module):
             platform.request("att_spi", 0),
             platform.request("att_spi", 1),
         )
-        self.submodules.spi = SPIMachine()
+        self.submodules.spi = SPIMachine(data_width=8, div_width=8)
         self.comb += [
             self.decoder.get("sta", "read")[6:].eq(Cat(
                 self.spi.idle, self.spi.writable)),
@@ -118,7 +112,7 @@ class Phaser(Module):
             # self.spi.readable, self.spi.writable, self.spi.idle,
             self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
             self.spiint.cs_polarity.eq(0),  # all active low
-            self.spi.length.eq(self.decoder.get("spi_len", "write")),
+            self.spi.length.eq(8 - 1),  # always
             self.spi.cg.div.eq(self.decoder.get("spi_div", "write")),
             Cat(self.spiint.offline, self.spi.end,
                 self.spi.clk_phase, self.spiint.clk_polarity,
@@ -132,7 +126,7 @@ class Phaser(Module):
             self.spiint.sdo.eq(self.spi.reg.sdo),
         ]
         self.sync += [
-            # load on MSB write
+            # load on write
             self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
         ]
 
@@ -144,8 +138,10 @@ class Phaser(Module):
             duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
             self.submodules += duc
             self.sync += [
+                # keep accu cleared
                 duc.clr.eq(self.decoder.get("duc_cfg", "write")[i]),
                 If(self.decoder.registers["duc_stb"][0].bus.we,
+                    # clear accu once
                     If(self.decoder.get("duc_cfg", "write")[2 + i],
                         duc.clr.eq(1),
                     ),
@@ -173,10 +169,10 @@ class Phaser(Module):
                 )
             ]
         self.comb += [
-            self.decoder.get("dac0_data", "read").eq(Cat(
-                self.data.data[0][0], self.data.data[1][0])),
-            self.decoder.get("dac1_data", "read").eq(Cat(
-                self.data.data[0][1], self.data.data[1][1])),
+            self.decoder.get("dac0_data", "read").eq(Cat([
+                d[0] for d in self.data.data])),
+            self.decoder.get("dac1_data", "read").eq(Cat([
+                d[1] for d in self.data.data])),
         ]
 
         self.comb += [
