@@ -126,9 +126,11 @@ class Unframer(Module):
         clk_sr = Signal(t_clk - 1, reset_less=True,
                         reset=((1 << t_clk//2) - 1) << (t_clk//2 - 1))
         clk_stb = Signal()
+        self.clk_stb = clk_stb
         marker_sr = Signal(n_marker, reset_less=True,
                            reset=((1 << n_marker - 1) - 1) << 1)
         marker_stb = Signal()
+        self.marker_stb = marker_stb
         response_sr = Signal(n_frame, reset_less=True)
 
         self.comb += [
@@ -281,7 +283,7 @@ class Test(Module):
 
 
 if __name__ == "__main__":
-    from phaser import Platform
+    from platform import Platform
     from crg import CRG
     platform = Platform(load=False)
     test = Test(platform)

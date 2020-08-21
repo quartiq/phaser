@@ -308,31 +308,3 @@ class PhasedDUC(Module):
             self.i.append(mod.i)
             self.o.append(mod.o)
         self.submodules += self.mods
-
-
-class Test(Module):
-    def __init__(self, platform):
-        crg = CRG(platform)
-        data = DacData(platform.request("dac_data"))
-        self.submodules += crg, data
-        ins = []
-        for i in range(2):
-            duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
-            self.submodules += duc
-            ins.extend([duc.f, duc.p, duc.clr])
-            for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
-                ins.extend([ji.i, ji.q])
-                self.comb += [
-                    data.data[2*j][i].eq(jo.i),
-                    data.data[2*j + 1][i].eq(jo.q),
-                ]
-        self.sync += Cat(ins).eq(Cat(platform.request("test_point"), Cat(ins)))
-
-
-if __name__ == "__main__":
-    from phaser import Platform
-    from crg import CRG
-    from dac_data import DacData
-    platform = Platform(load=True)
-    test = Test(platform)
-    platform.build(test)

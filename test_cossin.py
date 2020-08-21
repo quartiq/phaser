@@ -27,7 +27,7 @@ class Top(Module):
 
 
 if __name__ == "__main__":
-    from phaser import Platform
+    from platform import Platform
     platform = Platform(load=True)
     test = Top(platform)
     platform.build(test)

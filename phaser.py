@@ -1,331 +1,200 @@
-from migen.build.generic_platform import *
-from migen.build.xilinx import XilinxPlatform
+from migen import *
+from misoc.cores.spi2 import SPIMachine, SPIInterface
 
-_ios = [
-    ("user_led", 0, Pins("V5"), IOStandard("LVCMOS33")),  # LED0
-    ("user_led", 1, Pins("U6"), IOStandard("LVCMOS33")),  # LED1
-    ("user_led", 2, Pins("AA3"), IOStandard("LVCMOS33")),  # LED2
-    ("user_led", 3, Pins("W4"), IOStandard("LVCMOS33")),  # LED3
-    ("user_led", 4, Pins("AA4"), IOStandard("LVCMOS33")),  # LED4
-    ("user_led", 5, Pins("W5"), IOStandard("LVCMOS33")),  # LED5
-
-    ("test_point", 0, Pins("N15"), IOStandard("LVCMOS25")),  # TP0
-    ("test_point", 1, Pins("P15"), IOStandard("LVCMOS25")),  # TP1
-    ("test_point", 2, Pins("N13"), IOStandard("LVCMOS25")),  # TP2
-    ("test_point", 3, Pins("P16"), IOStandard("LVCMOS25")),  # TP3
-    ("test_point", 4, Pins("N14"), IOStandard("LVCMOS25")),  # TP4
-    ("test_point", 5, Pins("R16"), IOStandard("LVCMOS25")),  # TP5
-
-    ("clk_sel", 0, Pins("T20"), IOStandard("LVCMOS25")),  # SMA_CLK_SEL
-
-    ("hw_variant", 0, Pins("N19"), IOStandard("LVCMOS25")),  # ASSY_VARIANT
-    ("hw_rev", 0, Pins("N18 M17 M15 M16"), IOStandard("LVCMOS25")),  # HW_REV
-
-    ("fan_pwm", 0, Pins("AB7"), IOStandard("LVCMOS33")),
-
-    ("i2c", 0,  # EEM0_I2C
-        Subsignal("scl", Pins("AB1")),
-        Subsignal("sda", Pins("AA1")),
-        IOStandard("LVCMOS33")
-    ),
-    ("i2c", 1,  # EEM1_I2C
-        Subsignal("scl", Pins("Y2")),
-        Subsignal("sda", Pins("Y3")),
-        IOStandard("LVCMOS33")
-    ),
-
-    ("spiflash", 0,
-        Subsignal("cs_n", Pins("T19")),
-        Subsignal("dq", Pins("P22 R22 P21 R21")),
-        # "clk" is on CCLK
-        IOStandard("LVCMOS25")
-    ),
-    ("spiflash2x", 0,
-        Subsignal("cs_n", Pins("T19")),
-        Subsignal("dq", Pins("P22 R22")),
-        Subsignal("wp", Pins("P21")),
-        Subsignal("hold", Pins("R21")),
-        # "clk" is on CCLK
-        IOStandard("LVCMOS25")
-    ),
-
-    ("clk125_gtp", 0,
-        Subsignal("p", Pins("F10")),
-        Subsignal("n", Pins("E10")),
-    ),
-
-    ("clk_gtp", 0,
-        Subsignal("p", Pins("F6")),
-        Subsignal("n", Pins("E6")),
-    ),
-
-    ("mgt", 0,
-        Subsignal("txp", Pins("B4")),
-        Subsignal("txn", Pins("A4")),
-        Subsignal("rxp", Pins("B8")),
-        Subsignal("rxn", Pins("A8")),
-    ),
-    ("mgt", 1,
-        Subsignal("txp", Pins("D5")),
-        Subsignal("txn", Pins("C5")),
-        Subsignal("rxp", Pins("D11")),
-        Subsignal("rxn", Pins("C11")),
-    ),
-    ("mgt", 2,
-        Subsignal("txp", Pins("B6")),
-        Subsignal("txn", Pins("A6")),
-        Subsignal("rxp", Pins("B10")),
-        Subsignal("rxn", Pins("A10")),
-    ),
-    ("mgt", 3,
-        Subsignal("txp", Pins("D7")),
-        Subsignal("txn", Pins("C7")),
-        Subsignal("rxp", Pins("D9")),
-        Subsignal("rxn", Pins("C9")),
-    ),
-
-    ("ddram", 0,
-        Subsignal("a", Pins(
-            "L6 M5 P6 K6 M1 M3 N2 M6 "
-            "P1 P2 L4 N5 L3 R1 N3"),
-            IOStandard("SSTL15")),
-        Subsignal("ba", Pins("L5 M2 N4"), IOStandard("SSTL15")),
-        Subsignal("ras_n", Pins("J4"), IOStandard("SSTL15")),
-        Subsignal("cas_n", Pins("J6"), IOStandard("SSTL15")),
-        Subsignal("we_n", Pins("K3"), IOStandard("SSTL15")),
-        # Subsignal("cs_n", Pins(""), IOStandard("SSTL15")),
-        Subsignal("dm", Pins("G2 E2"), IOStandard("SSTL15")),
-        Subsignal("dq", Pins(
-            "G3 J1 H4 H5 H2 K1 H3 J5 "
-            "G1 B1 F1 F3 C2 A1 D2 B2"),
-            IOStandard("SSTL15"),
-            Misc("IN_TERM=UNTUNED_SPLIT_50")),
-        Subsignal("dqs_p", Pins("K2 E1"), IOStandard("DIFF_SSTL15")),
-        Subsignal("dqs_n", Pins("J2 D1"), IOStandard("DIFF_SSTL15")),
-        Subsignal("clk_p", Pins("P5"), IOStandard("DIFF_SSTL15")),
-        Subsignal("clk_n", Pins("P4"), IOStandard("DIFF_SSTL15")),
-        Subsignal("cke", Pins("L1"), IOStandard("SSTL15")),
-        Subsignal("odt", Pins("K4"), IOStandard("SSTL15")),
-        Subsignal("reset_n", Pins("G4"), IOStandard("LVCMOS15")),
-        Misc("SLEW=FAST")
-    ),
-
-    ("adc_ctrl", 0,
-        Subsignal("term_stat", Pins("W6 Y6")),
-        Subsignal("gain0", Pins("AB5 AA5")),
-        Subsignal("gain1", Pins("AA6 AB6")),
-        IOStandard("LVCMOS33")
-    ),
-
-    ("adc", 0,
-        Subsignal("sck_n", Pins("N22")),
-        Subsignal("sck_p", Pins("M22")),
-        Subsignal("clkout_n", Pins("K19"), Misc("DIFF_TERM=TRUE")),
-        Subsignal("clkout_p", Pins("K18"), Misc("DIFF_TERM=TRUE")),
-        Subsignal("cnvn_n", Pins("J22")),
-        Subsignal("cnvn_p", Pins("H22")),
-        Subsignal("sdo_n", Pins("K22 M21"), Misc("DIFF_TERM=TRUE")),
-        Subsignal("sdo_p", Pins("K21 L21"), Misc("DIFF_TERM=TRUE")),
-        IOStandard("LVDS_25")
-    ),
-
-    ("trf_ctrl", 0,
-        Subsignal("ps", Pins("U1")),
-        Subsignal("ld", Pins("U2")),
-        IOStandard("LVCMOS33")
-    ),
-
-    ("trf_spi", 0,
-        Subsignal("clk", Pins("U3")),
-        Subsignal("miso", Pins("V9")),  # RDBK
-        Subsignal("mosi", Pins("T3")),  # DATA
-        Subsignal("cs_n", Pins("T1")),  # LE
-        IOStandard("LVCMOS33")
-    ),
-
-    ("trf_ctrl", 1,
-        Subsignal("ps", Pins("W7")),
-        Subsignal("ld", Pins("V2")),
-        IOStandard("LVCMOS33")
-    ),
-
-    ("trf_spi", 1,
-        Subsignal("clk", Pins("Y1")),
-        Subsignal("miso", Pins("V7")),  # RDBK
-        Subsignal("mosi", Pins("W1")),  # DATA
-        Subsignal("cs_n", Pins("W2")),  # LE
-        IOStandard("LVCMOS33")
-    ),
-
-    ("att_rstn", 0, Pins("T4"), IOStandard("LVCMOS33")),
-
-    ("att_spi", 0,
-        Subsignal("clk", Pins("R4")),
-        Subsignal("miso", Pins("T5")),  # RDBK
-        Subsignal("mosi", Pins("R2")),  # DATA
-        Subsignal("cs_n", Pins("R3")),  # LE
-        IOStandard("LVCMOS33")
-    ),
-
-    ("att_rstn", 1, Pins("V3"), IOStandard("LVCMOS33")),
-
-    ("att_spi", 1,
-        Subsignal("clk", Pins("T6")),
-        Subsignal("miso", Pins("V4")),  # RDBK
-        Subsignal("mosi", Pins("U5")),  # DATA
-        Subsignal("cs_n", Pins("R6")),  # LE
-        IOStandard("LVCMOS33")
-    ),
-
-    ("dac_ctrl", 0,
-        Subsignal("alarm", Pins("AB8")),
-        Subsignal("resetb", Pins("Y7")),
-        Subsignal("sleep", Pins("Y8")),
-        Subsignal("txena", Pins("V8")),
-        IOStandard("LVCMOS33")
-    ),
-
-    ("dac_spi", 0,
-        Subsignal("clk", Pins("U7")),  # SCLK
-        Subsignal("miso", Pins("AA8")),  # SDO
-        Subsignal("mosi", Pins("W9")),  # SDIO
-        Subsignal("cs_n", Pins("Y9")),  # SDENB
-        IOStandard("LVCMOS33")
-    ),
-
-    ("dac_data", 0,
-        Subsignal("data_a_n", Pins(
-            "F20 D19 E18 C22 C17 A19 E17 D21 "
-            "D16 C19 B18 D15 E14 F14 B16 C15")),
-        Subsignal("data_a_p", Pins(
-            "F19 E19 F18 B22 D17 A18 F16 E21 "
-            "E16 C18 B17 D14 E13 F13 B15 C14")),
-        Subsignal("data_b_n", Pins(
-            "G16 M20 G20 H19 H18 L18 J21 H15 "
-            "L16 L15 K14 J17 H14 L20 G13 L13")),
-        Subsignal("data_b_p", Pins(
-            "G15 N20 H20 J19 H17 M18 J20 J15 "
-            "K16 L14 K13 K17 J14 L19 H13 M13")),
-        Subsignal("data_clk_n", Pins("D22")),
-        Subsignal("data_clk_p", Pins("E22")),
-        Subsignal("ostr_n", Pins("B13")),
-        Subsignal("ostr_p", Pins("C13")),
-        Subsignal("istr_parityab_n", Pins("G22")),
-        Subsignal("istr_parityab_p", Pins("G21")),
-        Subsignal("paritycd_n", Pins("G18")),
-        Subsignal("paritycd_p", Pins("G17")),
-        Subsignal("sync_n", Pins("A14")),
-        Subsignal("sync_p", Pins("A13")),
-        IOStandard("LVDS_25")
-    ),
-]
-
-_connectors = [
-    ("eem0", {
-        "d0_cc_n": "W20",
-        "d0_cc_p": "W19",
-        "d1_n": "U21",
-        "d1_p": "T21",
-        "d2_n": "W22",
-        "d2_p": "W21",
-        "d3_n": "T18",
-        "d3_p": "R18",
-        "d4_n": "V20",
-        "d4_p": "U20",
-        "d5_n": "R19",
-        "d5_p": "P19",
-        "d6_n": "V19",
-        "d6_p": "V18",
-        "d7_n": "W17",
-        "d7_p": "V17",
-    }),
-    ("eem1", {
-        "d0_cc_n": "Y19",
-        "d0_cc_p": "Y18",
-        "d1_n": "AB20",
-        "d1_p": "AA19",
-        "d2_n": "AA21",
-        "d2_p": "AA20",
-        "d3_n": "AB18",
-        "d3_p": "AA18",
-        "d4_n": "AB22",
-        "d4_p": "AB21",
-        "d5_n": "Y22",
-        "d5_p": "Y21",
-        "d6_n": "U18",
-        "d6_p": "U17",
-        "d7_n": "R14",
-        "d7_p": "P14",
-    }),
-]
+from crg import CRG
+from link import Link
+from decode import Decode, Register
+from duc import PhasedDUC
+from dac_data import DacData
 
 
-_extensions = [
-    ("eem", i, IOStandard("LVDS_25")) + tuple([
-        Subsignal("data{}_{}".format(j, p), Pins(
-            "eem{}:d{}{}_{}".format(i, j, "_cc" if j == 0 else "", p)))
-                for j in range(8) for p in "pn"])
-    for i in range(2)
-]
+class PWM(Module):
+    def __init__(self, pin):
+        cnt = Signal(10, reset_less=True)
+        self.duty = Signal.like(cnt)
+        self.sync += [
+            cnt.eq(cnt + 1),
+            If(cnt == 0,
+                pin.eq(1),
+            ),
+            If(cnt == self.duty,
+                pin.eq(0),
+            ),
+        ]
 
 
-class Platform(XilinxPlatform):
-    userid = 0xffffffff
-    def __init__(self, load=False, flash=False):
-        XilinxPlatform.__init__(
-                self, "xc7a100t-fgg484-2", _ios, _connectors,
-                toolchain="vivado")
-        self.add_extension(_extensions)
-        self.add_platform_command(
-                "set_property INTERNAL_VREF 0.750 [get_iobanks 35]")
-        self.toolchain.bitstream_commands.extend([
-            "set_property BITSTREAM.CONFIG.OVERTEMPPOWERDOWN "
-                "Enable [current_design]",
-            "set_property BITSTREAM.GENERAL.COMPRESS True [current_design]",
-            "set_property BITSTREAM.CONFIG.CONFIGRATE 33 [current_design]",
-            "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]",
-            "set_property BITSTREAM.CONFIG.USR_ACCESS "
-                "TIMESTAMP [current_design]",
-            "set_property BITSTREAM.CONFIG.USERID "
-                "\"{:#010x}\" [current_design]".format(self.userid),
-            "set_property CFGBVS VCCO [current_design]",
-            "set_property CONFIG_VOLTAGE 2.5 [current_design]",
+class Phaser(Module):
+    def __init__(self, platform):
+        eem = platform.request("eem", 0)
+        self.submodules.link = Link(eem)
+        self.submodules.crg = CRG(platform, link=self.link.phy.clk)
+        platform.add_period_constraint(eem.data0_p, 4.*8)
+        platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
+        self.submodules.decoder = Decode(
+            b_sample=14, n_channel=2, n_mux=8, t_frame=8*10)
+        self.comb += [
+            self.decoder.frame.eq(self.link.checker.frame),
+            self.decoder.stb.eq(self.link.checker.frame_stb),
+        ]
+
+        self.decoder.map_registers([
+            (0x00,),
+            ("id", Register(write=False)),
+            ("hw_rev", Register(write=False)),
+            ("gw_rev", Register(write=False)),
+            ("cfg", Register()),
+            ("sta", Register(write=False)),
+            ("led", Register(width=6)),
+            ("fan", Register()),
+            ("duc_cfg", Register()),
+            ("duc_stb", Register(write=False, read=False)),
+            ("adc_cfg", Register(width=4)),
+            ("spi_cfg", Register()),
+            ("spi_div", Register()),
+            ("spi_sel", Register()),
+            ("spi_datw", Register(read=False)),
+            ("spi_datr", Register(write=False)),
+            (0x10,),
+            ("duc0_f", Register(), Register(), Register(), Register()),
+            ("duc0_p", Register(), Register()),
+            ("dac0_data", Register(write=False), Register(write=False),
+                          Register(write=False), Register(write=False)),
+            ("dac0_test", Register(read=False), Register(read=False),
+                          Register(read=False), Register(read=False)),
+            (0x20,),
+            ("duc1_f", Register(), Register(), Register(), Register()),
+            ("duc1_p", Register(), Register()),
+            ("dac1_data", Register(write=False), Register(write=False),
+                          Register(write=False), Register(write=False)),
+            ("dac1_test", Register(read=False), Register(read=False),
+                          Register(read=False), Register(read=False)),
         ])
-        if load or flash:
-            self.toolchain.additional_commands.extend([
-                "open_hw_manager",
-                "connect_hw_server",
-                "open_hw_target",
-                "current_hw_device [lindex [get_hw_devices] 0]",
-            ] + ([
-                "write_cfgmem -force -format MCS -size 8 -interface SPIx4 "
-                    "-loadbit \"up 0x0 {build_name}.bit\" {build_name}",
-                "create_hw_cfgmem -hw_device [current_hw_device] "
-                    "[lindex [get_cfgmem_parts "
-                    "{{s25fl128sxxxxxx0-spi-x1_x2_x4}}] 0]",
-                "set_property PROGRAM.BLANK_CHECK 0 [current_hw_cfgmem]",
-                "set_property PROGRAM.ERASE 1 [current_hw_cfgmem]",
-                "set_property PROGRAM.CFG_PROGRAM 1 [current_hw_cfgmem]",
-                "set_property PROGRAM.VERIFY 1 [current_hw_cfgmem]",
-                "set_property PROGRAM.CHECKSUM 0 [current_hw_cfgmem]",
-                "set_property PROGRAM.ADDRESS_RANGE "
-                    "{{use_file}} [current_hw_cfgmem]",
-                "set_property PROGRAM.FILES "
-                    "{{{build_name}.mcs}} [current_hw_cfgmem]",
-                "set_property PROGRAM.UNUSED_PIN_TERMINATION "
-                    "{{pull-none}} [current_hw_cfgmem]",
-                "create_hw_bitstream -hw_device [current_hw_device] "
-                    "[get_property PROGRAM.HW_CFGMEM_BITFILE "
-                    "[current_hw_device]]",
-                "program_hw_devices",
-                "program_hw_cfgmem",
-                "boot_hw_device -verbose [current_hw_device]"
-            ] if flash else [
-                "set_property PROGRAM.FILE {{{build_name}.bit}} "
-                   "[current_hw_device]",
-                "program_hw_devices",
-                # "refresh_hw_device",
-            ]) + [
-                "close_hw_target",
-                "close_hw_manager"
-            ])
+
+        dac_ctrl = platform.request("dac_ctrl")
+        trf_ctrl = [platform.request("trf_ctrl") for _ in range(2)]
+        att_rstn = [platform.request("att_rstn") for _ in range(2)]
+        adc_ctrl = platform.request("adc_ctrl")
+        self.comb += [
+            self.decoder.get("id", "read").eq(19),  # Sinara.boards.index("Phaser")
+            self.decoder.get("hw_rev", "read").eq(Cat(
+                platform.request("hw_rev"), platform.request("hw_variant"))),
+            self.decoder.get("gw_rev", "read").eq(0x01),
+            Cat([platform.request("user_led", i) for i in range(6)]).eq(
+                self.decoder.get("led", "write")),
+            Cat(platform.request("clk_sel"), dac_ctrl.resetb, dac_ctrl.sleep,
+                dac_ctrl.txena, trf_ctrl[0].ps, trf_ctrl[1].ps,
+                att_rstn[0], att_rstn[1]).eq(self.decoder.get("cfg", "write")),
+            self.decoder.get("sta", "read")[:6].eq(Cat(
+                dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
+                adc_ctrl.term_stat)),  # 6, 7 for spi machine
+            Cat(adc_ctrl.gain0, adc_ctrl.gain1).eq(
+                self.decoder.get("adc_cfg", "write")),
+        ]
+
+        fan = platform.request("fan_pwm")
+        fan.reset_less = True
+        self.submodules.fan = PWM(fan)
+        self.comb += self.fan.duty[-8:].eq(self.decoder.get("fan", "write"))
+
+        self.submodules.spiint = SPIInterface(
+            platform.request("dac_spi"),
+            platform.request("trf_spi", 0),
+            platform.request("trf_spi", 1),
+            platform.request("att_spi", 0),
+            platform.request("att_spi", 1),
+        )
+        self.submodules.spi = SPIMachine(data_width=8, div_width=8)
+        self.comb += [
+            self.decoder.get("sta", "read")[6:].eq(Cat(
+                self.spi.idle, self.spi.writable)),
+            self.spi.reg.pdo.eq(self.decoder.get("spi_datw", "write")),
+            self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
+            # self.spi.readable, self.spi.writable, self.spi.idle,
+            self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
+            self.spiint.cs_polarity.eq(0),  # all active low
+            self.spi.length.eq(8 - 1),  # always
+            self.spi.cg.div.eq(self.decoder.get("spi_div", "write")),
+            Cat(self.spiint.offline, self.spi.end,
+                self.spi.clk_phase, self.spiint.clk_polarity,
+                self.spiint.half_duplex, self.spi.reg.lsb_first).eq(
+                    self.decoder.get("spi_cfg", "write")),
+            self.spiint.cs_next.eq(self.spi.cs_next),
+            self.spiint.clk_next.eq(self.spi.clk_next),
+            self.spiint.ce.eq(self.spi.ce),
+            self.spiint.sample.eq(self.spi.reg.sample),
+            self.spi.reg.sdi.eq(self.spiint.sdi),
+            self.spiint.sdo.eq(self.spi.reg.sdo),
+        ]
+        self.sync += [
+            # load on write
+            self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
+        ]
+
+        self.submodules.data = DacData(platform.request("dac_data"))
+        self.comb += [
+            self.data.data_sync.eq(self.decoder.zoh.sample_mark),
+        ]
+        for i in range(2):
+            duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
+            self.submodules += duc
+            self.sync += [
+                # keep accu cleared
+                duc.clr.eq(self.decoder.get("duc_cfg", "write")[i]),
+                If(self.decoder.registers["duc_stb"][0].bus.we,
+                    # clear accu once
+                    If(self.decoder.get("duc_cfg", "write")[2 + i],
+                        duc.clr.eq(1),
+                    ),
+                    duc.f.eq(self.decoder.get("duc{}_f".format(i), "write")),
+                    duc.p.eq(self.decoder.get("duc{}_p".format(i), "write")),
+                ),
+            ]
+            mux = self.decoder.get("duc_cfg", "write")[2*(i + 2):2*(i + 3)]
+            for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
+                self.comb += [
+                    ji.eq(self.decoder.zoh.sample[i]),
+                ]
+                self.sync += [
+                    If(mux == 0,
+                        self.data.data[2*j][i].eq(jo.i),
+                        self.data.data[2*j + 1][i].eq(jo.q),
+                    )
+                ]
+
+            self.sync += [
+                If(mux == 1,
+                    Cat([d[i] for d in self.data.data]).eq(Cat(
+                        self.decoder.get("dac{}_test".format(i), "write"),
+                        self.decoder.get("dac{}_test".format(i), "write"))),
+                )
+            ]
+        self.comb += [
+            self.decoder.get("dac0_data", "read").eq(Cat([
+                d[0] for d in self.data.data])),
+            self.decoder.get("dac1_data", "read").eq(Cat([
+                d[1] for d in self.data.data])),
+        ]
+
+        self.comb += [
+            Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
+                #self.link.phy.clk,
+                #ClockSignal(),
+                #ResetSignal(),
+                #self.link.slip.bitslip,
+                #self.link.unframe.data[0],
+                self.link.unframe.data[0],
+                self.link.unframe.data[1],
+                self.link.unframe.clk_stb,
+                self.link.unframe.marker_stb,
+                self.link.unframe.end_of_frame,
+                #self.link.checker.frame_stb,
+                #self.data.data_sync
+            )) 
+        ]
+
+
+if __name__ == "__main__":
+    from platform import Platform
+    platform = Platform(load=True)
+    test = Phaser(platform)
+    platform.build(test, build_name="phaser")
