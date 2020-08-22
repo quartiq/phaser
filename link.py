@@ -235,8 +235,8 @@ class Link(Module):
             n_data=7, n_frame=10, t_clk=8)
         self.comb += [
             self.unframe.valid.eq(self.slip.valid),
-            [self.unframe.data[i].eq(self.phy.data[i][n_serde//2 - 1])
-             for i in range(len(self.phy.data))],
+            self.unframe.data.eq(Cat([
+                d[n_serde//2 - 1] for d in self.phy.data])),
             self.phy.out.eq(Replicate(self.unframe.out, n_serde)),
         ]
         self.submodules.checker = Checker(n_data=6, n_frame=10, t_clk=8)

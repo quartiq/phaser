@@ -114,15 +114,10 @@ class Bus(Module):
         ]
 
 
-ext_layout = [
-    ("cs", 1),
-    ("sck", 1),
-    ("sdo", 1),
-    ("sdi", 1),
-]
-
-
 class Decode(Module):
+    """Decode a frame into samples and metadata and drive
+    a bus of registers from the metadata.
+    """
     def __init__(self, b_sample, n_channel, n_mux, t_frame):
         n_samples = n_mux*n_channel*2
         header = Record(header_layout)
@@ -169,7 +164,8 @@ class Decode(Module):
                 addr += 1
 
     def get(self, name, attr):
-        regs = self.registers[name]
+        regs = [getattr(reg, attr) for reg in self.registers[name]]
         if len(regs) == 1:
-            return getattr(regs[0], attr)
-        return Cat([getattr(reg, attr) for reg in regs])
+            return regs[0]
+        else:
+            return Cat(reversed(regs))  # big endian

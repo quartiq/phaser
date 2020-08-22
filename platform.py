@@ -161,8 +161,8 @@ _ios = [
 
     ("att_spi", 0,
         Subsignal("clk", Pins("R4")),
-        Subsignal("miso", Pins("T5")),  # RDBK
-        Subsignal("mosi", Pins("R2")),  # DATA
+        Subsignal("miso", Pins("T5")),  # S_OUT
+        Subsignal("mosi", Pins("R2")),  # S_IN
         Subsignal("cs_n", Pins("R3")),  # LE
         IOStandard("LVCMOS33")
     ),
@@ -171,8 +171,8 @@ _ios = [
 
     ("att_spi", 1,
         Subsignal("clk", Pins("T6")),
-        Subsignal("miso", Pins("V4")),  # RDBK
-        Subsignal("mosi", Pins("U5")),  # DATA
+        Subsignal("miso", Pins("V4")),  # S_OUT
+        Subsignal("mosi", Pins("U5")),  # S_IN
         Subsignal("cs_n", Pins("R6")),  # LE
         IOStandard("LVCMOS33")
     ),

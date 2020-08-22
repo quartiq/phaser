@@ -44,9 +44,9 @@ class Phaser(Module):
             ("gw_rev", Register(write=False)),
             ("cfg", Register()),
             ("sta", Register(write=False)),
+            ("crc_err", Register(write=False)),
             ("led", Register(width=6)),
             ("fan", Register()),
-            ("duc_cfg", Register()),
             ("duc_stb", Register(write=False, read=False)),
             ("adc_cfg", Register(width=4)),
             ("spi_cfg", Register()),
@@ -54,20 +54,23 @@ class Phaser(Module):
             ("spi_sel", Register()),
             ("spi_datw", Register(read=False)),
             ("spi_datr", Register(write=False)),
+            ("reserved0", Register(read=False, write=False)),
             (0x10,),
+            ("duc0_cfg", Register()),
+            ("duc0_reserved", Register(read=False, write=False)),
             ("duc0_f", Register(), Register(), Register(), Register()),
             ("duc0_p", Register(), Register()),
             ("dac0_data", Register(write=False), Register(write=False),
                           Register(write=False), Register(write=False)),
-            ("dac0_test", Register(read=False), Register(read=False),
-                          Register(read=False), Register(read=False)),
+            ("dac0_test", Register(), Register(), Register(), Register()),
             (0x20,),
+            ("duc1_cfg", Register()),
+            ("duc1_reserved", Register(read=False, write=False)),
             ("duc1_f", Register(), Register(), Register(), Register()),
             ("duc1_p", Register(), Register()),
             ("dac1_data", Register(write=False), Register(write=False),
                           Register(write=False), Register(write=False)),
-            ("dac1_test", Register(read=False), Register(read=False),
-                          Register(read=False), Register(read=False)),
+            ("dac1_test", Register(), Register(), Register(), Register()),
         ])
 
         dac_ctrl = platform.request("dac_ctrl")
@@ -84,11 +87,9 @@ class Phaser(Module):
             Cat(platform.request("clk_sel"), dac_ctrl.resetb, dac_ctrl.sleep,
                 dac_ctrl.txena, trf_ctrl[0].ps, trf_ctrl[1].ps,
                 att_rstn[0], att_rstn[1]).eq(self.decoder.get("cfg", "write")),
-            self.decoder.get("sta", "read")[:6].eq(Cat(
-                dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
-                adc_ctrl.term_stat)),  # 6, 7 for spi machine
             Cat(adc_ctrl.gain0, adc_ctrl.gain1).eq(
                 self.decoder.get("adc_cfg", "write")),
+            self.decoder.get("crc_err", "read").eq(self.link.checker.crc_err),
         ]
 
         fan = platform.request("fan_pwm")
@@ -105,8 +106,9 @@ class Phaser(Module):
         )
         self.submodules.spi = SPIMachine(data_width=8, div_width=8)
         self.comb += [
-            self.decoder.get("sta", "read")[6:].eq(Cat(
-                self.spi.idle, self.spi.writable)),
+            self.decoder.get("sta", "read").eq(Cat(
+                dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
+                adc_ctrl.term_stat, self.spi.idle)),
             self.spi.reg.pdo.eq(self.decoder.get("spi_datw", "write")),
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
             # self.spi.readable, self.spi.writable, self.spi.idle,
@@ -137,35 +139,35 @@ class Phaser(Module):
         for i in range(2):
             duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
             self.submodules += duc
+            cfg = self.decoder.get("duc{}_cfg".format(i), "write")
             self.sync += [
                 # keep accu cleared
-                duc.clr.eq(self.decoder.get("duc_cfg", "write")[i]),
+                duc.clr.eq(cfg[0]),
                 If(self.decoder.registers["duc_stb"][0].bus.we,
                     # clear accu once
-                    If(self.decoder.get("duc_cfg", "write")[2 + i],
+                    If(cfg[1],
                         duc.clr.eq(1),
                     ),
                     duc.f.eq(self.decoder.get("duc{}_f".format(i), "write")),
-                    duc.p.eq(self.decoder.get("duc{}_p".format(i), "write")),
+                    duc.p[2:].eq(self.decoder.get("duc{}_p".format(i), "write")),
                 ),
             ]
-            mux = self.decoder.get("duc_cfg", "write")[2*(i + 2):2*(i + 3)]
             for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
                 self.comb += [
-                    ji.eq(self.decoder.zoh.sample[i]),
+                    ji.i[2:].eq(self.decoder.zoh.sample[i].i),
+                    ji.q[2:].eq(self.decoder.zoh.sample[i].q),
                 ]
                 self.sync += [
-                    If(mux == 0,
+                    If(cfg[2:4] == 0,
                         self.data.data[2*j][i].eq(jo.i),
                         self.data.data[2*j + 1][i].eq(jo.q),
                     )
                 ]
 
             self.sync += [
-                If(mux == 1,
-                    Cat([d[i] for d in self.data.data]).eq(Cat(
-                        self.decoder.get("dac{}_test".format(i), "write"),
-                        self.decoder.get("dac{}_test".format(i), "write"))),
+                If(cfg[2:4] == 1,
+                    Cat([d[i] for d in self.data.data]).eq(Replicate(
+                        self.decoder.get("dac{}_test".format(i), "write"), 2))
                 )
             ]
         self.comb += [
@@ -177,19 +179,19 @@ class Phaser(Module):
 
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
-                #self.link.phy.clk,
+                self.link.phy.clk,
                 #ClockSignal(),
                 #ResetSignal(),
                 #self.link.slip.bitslip,
                 #self.link.unframe.data[0],
-                self.link.unframe.data[0],
-                self.link.unframe.data[1],
+                #self.link.unframe.data[1],
                 self.link.unframe.clk_stb,
                 self.link.unframe.marker_stb,
                 self.link.unframe.end_of_frame,
-                #self.link.checker.frame_stb,
+                self.link.checker.frame_stb,
+                self.decoder.bus.bus.we,
                 #self.data.data_sync
-            )) 
+            ))
         ]
 
 
