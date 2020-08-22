@@ -132,17 +132,19 @@ class Decode(Module):
         self.submodules.zoh = SampleMux(
             b_sample=b_sample, n_channel=n_channel, n_mux=n_mux,
             t_frame=t_frame)
+        type1_stb = Signal()
         self.comb += [
             self.zoh.body.eq(body),
-            self.zoh.body_stb.eq(self.stb),
+            self.zoh.body_stb.eq(type1_stb),
+            type1_stb.eq(self.stb & (header.type == 1)),
         ]
 
         self.submodules.bus = Bus()
         self.comb += [
             self.bus.bus.dat_w.eq(header.data),
             self.bus.bus.adr.eq(header.addr),
-            self.bus.bus.we.eq(header.we & self.stb),
-            self.bus.bus.re.eq(~header.we & self.stb),
+            self.bus.bus.we.eq(header.we & type1_stb),
+            self.bus.bus.re.eq(~header.we & type1_stb),
             self.response.eq(self.bus.bus.dat_r),
         ]
 
