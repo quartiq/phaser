@@ -12,7 +12,8 @@ class CosSinGen(mg.Module):
     For background information about an alternative way of computing
     trigonometric functions without multipliers and large ROM, see:
 
-    P. K. Meher et al., "50 Years of CORDIC: Algorithms, Architectures, and Applications"
+    P. K. Meher et al., "50 Years of CORDIC: Algorithms, Architectures,
+    and Applications"
     in IEEE Transactions on Circuits and Systems I: Regular Papers, vol. 56, no. 9,
     pp. 1893-1907, Sept. 2009. doi: 10.1109/TCSI.2009.2025803
     https://eprints.soton.ac.uk/267873/1/tcas1_cordic_review.pdf
@@ -46,8 +47,11 @@ class CosSinGen(mg.Module):
     Multiplication by a amplitude scaling factor (`a*cos(z)`)
     and generation of the phase input (e.g. a phase accumulator)
     is to be implemented elsewhere.
+
+    Using a second port of an existing LUT is supported by passing the
+    existing `Memory` as `use_lut`.
     """
-    def __init__(self, z=18, x=15, zl=9, xd=4, backoff=None):
+    def __init__(self, z=18, x=15, zl=9, xd=4, backoff=None, use_lut=None):
         self.latency = 0  # computed later
         self.z = mg.Signal(z)  # input phase
         self.x = mg.Signal((x + 1, True), reset_less=True)  # output cos(z)
@@ -95,9 +99,15 @@ class CosSinGen(mg.Module):
         assert all(0 <= _ < 1 << len(lut_data) for _ in lut_init)
         logger.info("CosSin LUT {} bit deep, {} bit wide".format(
             zl, len(lut_data)))
-        self.lut = mg.Memory(len(lut_data), 1 << zl, init=lut_init)
+        if use_lut is not None:
+            assert all(a == b for a, b in zip(use_lut.init, lut_init))
+            self.lut = use_lut
+        else:
+            self.lut = mg.Memory(len(lut_data), 1 << zl, init=lut_init)
+            self.specials += self.lut
         lut_port = self.lut.get_port()
-        self.specials += self.lut, lut_port
+        self.specials += lut_port
+
         self.sync += [
             # use BRAM output data register
             lut_data.raw_bits().eq(lut_port.dat_r),
