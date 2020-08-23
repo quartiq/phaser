@@ -295,14 +295,19 @@ class PhasedDUC(Module):
     * Shift by frequency `f`, phase `p` (phase accumulator clear as `clr`).
     * Output phased sample index `j` as `o[j]`.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, zl=10, **kwargs):
         self.submodules.accu = PhasedAccu(**kwargs)
         self.f, self.p, self.clr = self.accu.f, self.accu.p, self.accu.clr
         self.i = []
         self.o = []
         self.mods = []
         for i in range(len(self.accu.z)):
-            mod = PhaseModulator(z=len(self.accu.z[0]), x=15)
+            if i & 1:
+                use_lut = self.mods[i - 1].cs.lut
+            else:
+                use_lut = None
+            mod = PhaseModulator(z=len(self.accu.z[0]), zl=zl,
+                    x=15, use_lut=use_lut)
             self.mods.append(mod)
             self.comb += mod.z.eq(self.accu.z[i])
             self.i.append(mod.i)

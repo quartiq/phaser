@@ -137,7 +137,7 @@ class Phaser(Module):
             self.data.data_sync.eq(self.decoder.zoh.sample_mark),
         ]
         for i in range(2):
-            duc = PhasedDUC(n=2, pwidth=18, fwidth=32)
+            duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
             cfg = self.decoder.get("duc{}_cfg".format(i), "write")
             self.sync += [

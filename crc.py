@@ -10,8 +10,8 @@ class CRC:
 
     Handle any variation on those details outside this class.
 
-    >>> r = CRC(0x1814141AB)(b"123456789")  # crc-32q
-    >>> assert r == 0x3010BF7F, hex(r)
+    >>> hex(CRC(0x1814141ab)(b"123456789"))  # crc-32q
+    '0x3010bf7f'
     """
     def __init__(self, poly, data_width=8):
         self.poly = poly
