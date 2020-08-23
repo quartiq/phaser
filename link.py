@@ -25,14 +25,14 @@ class Phy(Module):
 
         for i, data in enumerate(self.data):
             buf = Signal()
-            buf_n = Signal()
             dly = Signal()
+            thru = Signal()
             self.specials += [
-                Instance("IBUFGDS_DIFF_OUT" if i == 0 else "IBUFDS_DIFF_OUT",
+                Instance("IBUFGDS" if i == 0 else "IBUFDS",
                     attr={("DIFF_TERM", "TRUE")},
                     i_I=getattr(eem, "data{}_p".format(i)),
                     i_IB=getattr(eem, "data{}_n".format(i)),
-                    o_O=buf, o_OB=buf_n),
+                    o_O=buf),
                 Instance("IDELAYE2",
                     p_IDELAY_TYPE="VAR_LOAD", p_IDELAY_VALUE=0,
                     p_SIGNAL_PATTERN="DATA" if i else "CLOCK",
@@ -42,20 +42,21 @@ class Phy(Module):
                     i_INC=1,
                     i_CNTVALUEIN=self.cnt_out if i else cnt,
                     o_CNTVALUEOUT=Signal() if i else self.cnt_out,
-                    i_IDATAIN=buf if i else ~buf_n, o_DATAOUT=dly),
+                    i_IDATAIN=buf, o_DATAOUT=dly),
                 Instance("ISERDESE2",
                     p_DATA_RATE="DDR", p_DATA_WIDTH=4,
                     p_INTERFACE_TYPE="NETWORKING", p_NUM_CE=1,
                     p_IOBDELAY="IFD",
-                    i_DDLY=dly,
+                    i_D=buf, i_DDLY=dly,
                     i_BITSLIP=self.bitslip,
                     i_CLK=ClockSignal("sys2"), i_CLKB=~ClockSignal("sys2"),
                     i_CLKDIV=ClockSignal(), i_RST=ResetSignal(), i_CE1=1,
                     # MSB first, Q1 is closest to D
-                    o_Q1=data[0], o_Q2=data[1], o_Q3=data[2], o_Q4=data[3])
+                    o_Q1=data[0], o_Q2=data[1], o_Q3=data[2], o_Q4=data[3],
+                    o_O=thru)
             ]
             if i == 0:
-                self.comb += self.clk.eq(buf)
+                self.comb += self.clk.eq(thru)
         pin = Signal()
         data = self.out
         self.specials += [
