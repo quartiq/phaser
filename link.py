@@ -25,13 +25,14 @@ class Phy(Module):
 
         for i, data in enumerate(self.data):
             buf = Signal()
+            buf_n = Signal()
             dly = Signal()
             self.specials += [
-                Instance("IBUFGDS" if i == 0 else "IBUFDS",
+                Instance("IBUFGDS_DIFF_OUT" if i == 0 else "IBUFDS_DIFF_OUT",
                     attr={("DIFF_TERM", "TRUE")},
                     i_I=getattr(eem, "data{}_p".format(i)),
                     i_IB=getattr(eem, "data{}_n".format(i)),
-                    o_O=buf),
+                    o_O=buf, o_OB=buf_n),
                 Instance("IDELAYE2",
                     p_IDELAY_TYPE="VAR_LOAD", p_IDELAY_VALUE=0,
                     p_SIGNAL_PATTERN="DATA" if i else "CLOCK",
@@ -41,13 +42,12 @@ class Phy(Module):
                     i_INC=1,
                     i_CNTVALUEIN=self.cnt_out if i else cnt,
                     o_CNTVALUEOUT=Signal() if i else self.cnt_out,
-                    i_IDATAIN=buf, o_DATAOUT=dly),
+                    i_IDATAIN=buf if i else ~buf_n, o_DATAOUT=dly),
                 Instance("ISERDESE2",
                     p_DATA_RATE="DDR", p_DATA_WIDTH=4,
                     p_INTERFACE_TYPE="NETWORKING", p_NUM_CE=1,
-                    # p_IOBDELAY="IFD",
-                    p_IOBDELAY="NONE",
-                    i_DDLY=dly, i_D=buf,
+                    p_IOBDELAY="IFD",
+                    i_DDLY=dly,
                     i_BITSLIP=self.bitslip,
                     i_CLK=ClockSignal("sys2"), i_CLKB=~ClockSignal("sys2"),
                     i_CLKDIV=ClockSignal(), i_RST=ResetSignal(), i_CE1=1,
@@ -123,6 +123,7 @@ class Unframer(Module):
         # response data, latched on end_of_frame
         self.response = Signal(n_frame)
 
+        # 0b0000111 reset (plus the data[0] LSB)
         clk_sr = Signal(t_clk - 1, reset_less=True,
                         reset=((1 << t_clk//2) - 1) << (t_clk//2 - 1))
         clk_stb = Signal()
