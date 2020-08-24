@@ -124,7 +124,7 @@ class Decode(Module):
         body = Signal(n_samples*b_sample)
         self.frame = Signal(len(body) + len(header))
         self.stb = Signal()
-        self.response = Signal(8, reset_less=True)
+        self.response = Signal(8)
         self.comb += [
             Cat(header.raw_bits(), body).eq(self.frame),
         ]
@@ -171,3 +171,11 @@ class Decode(Module):
             return regs[0]
         else:
             return Cat(reversed(regs))  # big endian
+
+
+# straming gearbox
+#
+# 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+# ____----____----____----____----____----____----____----____----____----____----
+# 66666666666666666666666666666665666666656666666566666665666666656666666566666660
+#   4 2 0  4 2 0  4 2 0  4 2 0  4 

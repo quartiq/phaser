@@ -12,7 +12,7 @@ class Phy(Module):
         self.bitslip = Signal()
         self.cnt_out = Signal(5)
         self.data = [Signal(4) for i in range(7)]
-        self.out = Signal(4)
+        self.miso = Signal(4)
 
         cnt = Signal(5)
         self.comb += [
@@ -58,7 +58,7 @@ class Phy(Module):
             if i == 0:
                 self.comb += self.clk.eq(thru)
         pin = Signal()
-        data = self.out
+        data = self.miso
         self.specials += [
             Instance("OSERDESE2",
                 p_DATA_RATE_OQ="DDR", p_DATA_RATE_TQ="BUF",
@@ -110,17 +110,16 @@ class Unframer(Module):
     """
     def __init__(self, n_data, t_clk, n_frame):
         n_marker = n_frame//2 + 1
-        n_frame_total = n_frame*t_clk*(n_data - 1)
 
         # clock and data inputs
-        self.data = Signal(n_data)
-        self.valid = Signal()
+        self.data_in = Signal(n_data)
+        self.data_in_stb = Signal()
         # paybload data output
-        self.payload = Signal(n_data - 1, reset_less=True)
-        self.payload_stb = Signal()
+        self.data_out = Signal(n_data - 1, reset_less=True)
+        self.data_out_stb = Signal()
         self.end_of_frame = Signal(reset_less=True)
         # response bitstream
-        self.out = Signal(reset_less=True)
+        self.miso = Signal(reset_less=True)
         # response data, latched on end_of_frame
         self.response = Signal(n_frame)
 
@@ -128,32 +127,32 @@ class Unframer(Module):
         clk_sr = Signal(t_clk - 1, reset_less=True,
                         reset=((1 << t_clk//2) - 1) << (t_clk//2 - 1))
         clk_stb = Signal()
-        self.clk_stb = clk_stb
+        self.clk_stb = clk_stb  # debug
         marker_sr = Signal(n_marker, reset_less=True,
                            reset=((1 << n_marker - 1) - 1) << 1)
         marker_stb = Signal()
-        self.marker_stb = marker_stb
+        self.marker_stb = marker_stb  # debug
         response_sr = Signal(n_frame, reset_less=True)
 
         self.comb += [
             # clock pattern match (00001111)
-            clk_stb.eq(Cat(self.data[0], clk_sr) == (1 << t_clk//2) - 1),
-            # marker pattern match (000001)
+            clk_stb.eq(Cat(self.data_in[0], clk_sr) == (1 << t_clk//2) - 1),
+            # marker pattern match (000001x)
             marker_stb.eq(marker_sr == 1),
-            self.out.eq(response_sr[-1]),
+            self.miso.eq(response_sr[-1]),
         ]
         self.sync += [
-            clk_sr.eq(Cat(self.data[0], clk_sr)),
+            clk_sr.eq(Cat(self.data_in[0], clk_sr)),
             If(clk_stb,
-                marker_sr.eq(Cat(self.data[1], marker_sr)),
-                response_sr[1:].eq(response_sr),
+                marker_sr.eq(Cat(self.data_in[1], marker_sr)),
+                response_sr.eq(Cat(C(0), response_sr)),
             ),
-            #If(~self.valid,
+            #If(~self.data_in_stb,
             #    clk_sr.eq(clk_sr.reset),
             #    marker_sr.eq(marker_sr.reset),
             #),
-            self.payload_stb.eq(self.valid),
-            self.payload.eq(self.data[1:]),
+            self.data_out_stb.eq(self.data_in_stb),
+            self.data_out.eq(self.data_in[1:]),
             self.end_of_frame.eq(clk_stb & marker_stb),
             If(self.end_of_frame,
                 response_sr.eq(self.response),
@@ -236,15 +235,15 @@ class Link(Module):
         self.submodules.unframe = Unframer(
             n_data=7, n_frame=10, t_clk=8)
         self.comb += [
-            self.unframe.valid.eq(self.slip.valid),
-            self.unframe.data.eq(Cat([
+            self.unframe.data_in_stb.eq(self.slip.valid),
+            self.unframe.data_in.eq(Cat([
                 d[n_serde//2 - 1] for d in self.phy.data])),
-            self.phy.out.eq(Replicate(self.unframe.out, n_serde)),
+            self.phy.miso.eq(Replicate(self.unframe.miso, n_serde)),
         ]
         self.submodules.checker = Checker(n_data=6, n_frame=10, t_clk=8)
         self.comb += [
-            self.checker.data.eq(self.unframe.payload),
-            self.checker.data_stb.eq(self.unframe.payload_stb),
+            self.checker.data.eq(self.unframe.data_out),
+            self.checker.data_stb.eq(self.unframe.data_out_stb),
             self.checker.end_of_frame.eq(self.unframe.end_of_frame),
         ]
 

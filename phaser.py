@@ -35,6 +35,7 @@ class Phaser(Module):
         self.comb += [
             self.decoder.frame.eq(self.link.checker.frame),
             self.decoder.stb.eq(self.link.checker.frame_stb),
+            self.link.unframe.response.eq(self.decoder.response),
         ]
 
         self.decoder.map_registers([
@@ -179,17 +180,19 @@ class Phaser(Module):
 
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
-                self.link.phy.clk,
+                #self.link.phy.clk,
                 #ClockSignal(),
                 #ResetSignal(),
                 #self.link.slip.bitslip,
                 #self.link.unframe.data[0],
                 #self.link.unframe.data[1],
-                self.link.unframe.clk_stb,
-                self.link.unframe.marker_stb,
+                #self.link.unframe.clk_stb,
+                #self.link.unframe.marker_stb,
                 self.link.unframe.end_of_frame,
                 self.link.checker.frame_stb,
                 self.decoder.bus.bus.we,
+                self.decoder.bus.bus.re,
+                self.link.unframe.miso,
                 #self.data.data_sync
             ))
         ]
