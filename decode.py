@@ -54,6 +54,61 @@ class SampleMux(Module):
         ]
 
 
+class SampleGearbox(Module):
+    """Variable width input uneven ratio gearbox (e.g. 5/6 to 7)
+
+    `data_width <= sample_width`
+    """
+    def __init__(self, data_width, sample_width):
+        self.data = Signal(data_width, reset_less=True)
+        self.data_short = Signal()  # disregard data lsb
+        self.data_stb = Signal()  # input data strobe
+        self.clr = Signal()  # clear buffer level and disregard input data
+        self.sample = Signal(sample_width, reset_less=True)
+        self.sample_stb = Signal()  # output data strobe
+
+        buf = Signal(data_width + sample_width - 1, reset_less=True)
+        level = Signal(max=len(buf) + 1)
+        incoming = Signal(max=data_width + 1)
+        outgoing = Signal(max=sample_width + 1)
+        full = Signal()
+        self.comb += [
+            If(self.data_stb,
+                If(self.data_short,
+                    incoming.eq(data_width - 1),
+                ).Else(
+                    incoming.eq(data_width),
+                ),
+            ).Else(
+                incoming.eq(0),
+            ),
+            full.eq(level >= sample_width),
+            If(full,
+                outgoing.eq(sample_width),
+            ).Else(
+                outgoing.eq(0),
+            ),
+        ]
+        self.sync += [
+            If(self.data_stb,
+                buf.eq(Mux(self.data_short,
+                           Cat(self.data[1:], buf),
+                           Cat(self.data, buf),
+                )),
+            ),
+            self.sample_stb.eq(full),
+            If(full,
+                self.sample.eq(Case(level, {
+                    sample_width + i: buf[i:] for i in range(data_width - 1)
+                })),
+            ),
+            level.eq(level + incoming - outgoing),
+            If(self.clr,
+                level.eq(0),
+            ),
+        ]
+
+
 bus_layout = [
     ("adr", 7),
     ("re", 1),
