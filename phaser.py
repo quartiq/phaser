@@ -35,7 +35,8 @@ class Phaser(Module):
         self.comb += [
             self.decoder.frame.eq(self.link.checker.frame),
             self.decoder.stb.eq(self.link.checker.frame_stb),
-            self.link.unframe.response.eq(self.decoder.response),
+            # 2 bits for latency
+            self.link.unframe.response[2:].eq(self.decoder.response),
         ]
 
         self.decoder.map_registers([
