@@ -17,30 +17,28 @@ class SampleMux(Module):
     """Zero order hold interpolator.
 
     * `b_sample`: bits per sample (i or q)
-    * `n_mux`: iq samples per channel in body
     * `n_channel`: iq dac channels
-    * `n_mux`: sample repetitions (interpolation)
+    * `n_mux`: samples in a frame
     * `t_frame`: clock cycles per frame
     """
     def __init__(self, b_sample, n_channel, n_mux, t_frame):
+        n_interp, n_rest = divmod(t_frame, n_mux)
+        assert n_rest == 0
         self.body = Signal(b_sample*2*n_channel*n_mux)
         self.body_stb = Signal()
         self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
         self.sample_stb = Signal()
-        self.sample_mark = Signal()
-        samples = [Signal(n_channel*2*b_sample, reset_less=True) for _ in range(n_mux)]
+        samples = [Signal(b_sample*2*n_channel, reset_less=True) for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
-        i = Signal(max=n_mux, reset_less=True)
-        assert t_frame % n_mux == 0
-        j = Signal(max=t_frame//n_mux, reset_less=True)
+        i = Signal(max=n_mux, reset_less=True)  # body pointer
+        j = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
             Cat([_.raw_bits() for _ in self.sample]).eq(Array(samples)[i]),
         ]
         self.sync += [
-            self.sample_mark.eq(self.body_stb),
             j.eq(j + 1),
             self.sample_stb.eq(0),
-            If(j == t_frame//n_mux - 1,
+            If(j == n_interp - 1,
                 j.eq(0),
                 i.eq(i + 1),
                 self.sample_stb.eq(1),
@@ -49,7 +47,6 @@ class SampleMux(Module):
                 Cat(samples).eq(self.body),
                 i.eq(0),
                 j.eq(0),
-                self.sample_stb.eq(1),
             )
         ]
 
