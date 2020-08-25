@@ -198,8 +198,8 @@ class Decode(Module):
         self.comb += [
             self.bus.bus.dat_w.eq(header.data),
             self.bus.bus.adr.eq(header.addr),
-            self.bus.bus.we.eq(header.we & type1_stb),
-            self.bus.bus.re.eq(~header.we & type1_stb),
+            self.bus.bus.we.eq(header.we & self.stb),
+            self.bus.bus.re.eq(~header.we & self.stb),
             self.response.eq(self.bus.bus.dat_r),
         ]
 
