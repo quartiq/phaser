@@ -16,3 +16,18 @@ funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://gith
 ## Hardware
 
 https://github.com/sinara-hw/Phaser
+
+## Getting started
+
+### Loading bitstreams
+
+With vivado and a vivado-compatible JTAG dongle, to load (volatile) a bitstream onto the FPGA, use:
+
+`vivado -mode batch -source load.tcl -tclargs build/phaser.bit`
+
+To flash it, use:
+
+`vivado -mode batch -source flash.tcl -tclargs build/phaser.bit`
+
+With openocd and a JTAG dongle that fits the connector and has openocd support it
+should also be possible to load and flash using the `xc7a` support and the `jtagspi` proxy bitstreams.
