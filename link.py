@@ -118,10 +118,6 @@ class Unframer(Module):
         self.data_out = Signal(n_data - 1, reset_less=True)
         self.data_out_stb = Signal()
         self.end_of_frame = Signal(reset_less=True)
-        # response bitstream
-        self.miso = Signal(reset_less=True)
-        # response data, latched on end_of_frame
-        self.response = Signal(n_frame)
 
         # 0b0000111 reset (plus the data[0] LSB)
         clk_sr = Signal(t_clk - 1, reset_less=True,
@@ -132,20 +128,17 @@ class Unframer(Module):
                            reset=((1 << n_marker - 1) - 1) << 1)
         marker_stb = Signal()
         self.marker_stb = marker_stb  # debug
-        response_sr = Signal(n_frame, reset_less=True)
 
         self.comb += [
             # clock pattern match (00001111)
             clk_stb.eq(Cat(self.data_in[0], clk_sr) == (1 << t_clk//2) - 1),
             # marker pattern match (000001x)
             marker_stb.eq(marker_sr == 1),
-            self.miso.eq(response_sr[-1]),
         ]
         self.sync += [
             clk_sr.eq(Cat(self.data_in[0], clk_sr)),
             If(clk_stb,
                 marker_sr.eq(Cat(self.data_in[1], marker_sr)),
-                response_sr.eq(Cat(C(0), response_sr)),
             ),
             #If(~self.data_in_stb,
             #    clk_sr.eq(clk_sr.reset),
@@ -154,9 +147,6 @@ class Unframer(Module):
             self.data_out_stb.eq(self.data_in_stb),
             self.data_out.eq(self.data_in[1:]),
             self.end_of_frame.eq(clk_stb & marker_stb),
-            If(self.end_of_frame,
-                response_sr.eq(self.response),
-            ),
         ]
 
 
@@ -173,6 +163,10 @@ class Checker(Module):
         self.frame = Signal(n_word*n_frame - n_marker - n_crc)
         self.frame_stb = Signal()
         self.crc_err = Signal(8)
+        # response bitstream
+        self.miso = Signal(reset_less=True)
+        # response data, latched on end_of_frame
+        self.response = Signal(n_frame*t_clk, reset_less=True)
 
         poly = {
             # 6: 0x27,  # CRC-6-CDMA2000-A
@@ -217,6 +211,15 @@ class Checker(Module):
         assert len(Cat(frame_parts)) == len(self.frame)
         self.comb += self.frame.eq(Cat(frame_parts))
 
+        response_sr = Signal.like(self.response)
+        self.comb += self.miso.eq(response_sr[-1])
+        self.sync += [
+            response_sr[1:].eq(response_sr),
+            If(self.frame_stb,
+                response_sr.eq(self.response),
+            )
+        ]
+
 
 class Link(Module):
     """Kasli-Phaser link implementation
@@ -238,13 +241,13 @@ class Link(Module):
             self.unframe.data_in_stb.eq(self.slip.valid),
             self.unframe.data_in.eq(Cat([
                 d[n_serde//2 - 1] for d in self.phy.data])),
-            self.phy.miso.eq(Replicate(self.unframe.miso, n_serde)),
         ]
         self.submodules.checker = Checker(n_data=6, n_frame=10, t_clk=8)
         self.comb += [
             self.checker.data.eq(self.unframe.data_out),
             self.checker.data_stb.eq(self.unframe.data_out_stb),
             self.checker.end_of_frame.eq(self.unframe.end_of_frame),
+            self.phy.miso.eq(Replicate(self.checker.miso, n_serde)),
         ]
 
 

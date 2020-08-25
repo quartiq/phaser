@@ -35,8 +35,9 @@ class Phaser(Module):
         self.comb += [
             self.decoder.frame.eq(self.link.checker.frame),
             self.decoder.stb.eq(self.link.checker.frame_stb),
-            # 2 bits for latency
-            self.link.unframe.response[2:].eq(self.decoder.response),
+            # 2 miso bits max rtt latency
+            Cat(self.link.checker.response[2*8:]).eq(
+                Cat([Replicate(d, 8) for d in self.decoder.response])),
         ]
 
         self.decoder.map_registers([
@@ -189,11 +190,12 @@ class Phaser(Module):
                 #self.link.unframe.data[1],
                 #self.link.unframe.clk_stb,
                 #self.link.unframe.marker_stb,
-                self.link.unframe.end_of_frame,
+                #self.link.unframe.end_of_frame,
                 self.link.checker.frame_stb,
                 self.decoder.bus.bus.we,
                 self.decoder.bus.bus.re,
-                self.link.unframe.miso,
+                self.decoder.bus.bus.adr[0],
+                self.link.checker.miso,
                 #self.data.data_sync
             ))
         ]

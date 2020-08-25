@@ -21,7 +21,7 @@ class CRC:
                        for i in range(1 << data_width)]
 
     def _one(self, i):
-        for j in range(self.data_width):
+        for _ in range(self.data_width):
             i <<= 1
             if i & 1 << self.crc_width:
                 i ^= self.poly
