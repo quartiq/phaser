@@ -23,11 +23,21 @@ class DacData(Module):
             Signal(16, reset_less=True) for _ in range(2)
             ] for _ in range(4)]
 
-        words = [[Signal.like(i) for i in j] for j in self.data]
+        words = [[Signal.like(di) for di in d] for d in self.data]
         self.sync += Cat(words).eq(Cat(self.data))
 
         par = Signal(len(self.data), reset_less=True)
         self.sync += par.eq(Cat([parity(*word) for word in self.data]))
+
+        i = Signal(max=4, reset_less=True)
+        self.istr = Signal(reset_less=True)
+        self.sync += [
+            i.eq(i + 1),
+            self.istr.eq(i == 0),
+            If(self.data_sync,
+                i.eq(0),
+            ),
+        ]
 
         # 1/4 cycle (90 deg) delayed clock to have the rising edge on the
         # A/C sample without tweaking delays
@@ -35,10 +45,10 @@ class DacData(Module):
 
         # SYNC for PLL N divider, to dac_clk, not needed if N=1
         # for write pointer reset, to data_clk not needed
-        # self._oserdes([self.data_sync]*4, pins.sync_p, pins.sync_n)
+        # self._oserdes([self.istr]*4, pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
-        self._oserdes([self.data_sync, 0, 0, 0],
+        self._oserdes([self.istr, 0, 0, 0],
                       pins.istr_parityab_p, pins.istr_parityab_n)
 
         # 32 bit parity
