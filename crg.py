@@ -37,7 +37,7 @@ class CRG(Module):
                 i_I=clk125.p, i_IB=clk125.n,
                 o_O=self.clk125,
                 o_ODIV2=self.clk125_div2),
-            Instance("BUFH",
+            Instance("BUFG",
                 i_I=self.clk125, o_O=self.clk125_buf),
         ]
 
@@ -52,14 +52,14 @@ class CRG(Module):
         delay_rdy = Signal()
         self.specials += [
             Instance("MMCME2_BASE",
-                p_BANDWIDTH="LOW",
+                # p_BANDWIDTH="LOW",
                 p_CLKIN1_PERIOD=8. if link is None else 4.*8,
                 p_CLKFBOUT_MULT_F=8 if link is None else 4*8,
                 p_DIVCLK_DIVIDE=1,
                 i_CLKIN1=self.clk125_buf if link is None else link,
                 i_CLKFBIN=fb_buf, o_CLKFBOUT=fb,
                 o_LOCKED=locked,
-                #p_CLKOUT0_DIVIDE_F=4, p_CLKOUT0_PHASE=0, o_CLKOUT0=sys,
+                # p_CLKOUT0_DIVIDE_F=4, p_CLKOUT0_PHASE=0, o_CLKOUT0=sys,
                 p_CLKOUT1_DIVIDE=2, p_CLKOUT1_PHASE=0, o_CLKOUT1=sys2,
                 p_CLKOUT2_DIVIDE=2, p_CLKOUT2_PHASE=90, o_CLKOUT2=sys2q,
                 p_CLKOUT3_DIVIDE=4, p_CLKOUT3_PHASE=0, o_CLKOUT3=sys,

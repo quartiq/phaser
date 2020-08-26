@@ -137,7 +137,8 @@ class Phaser(Module):
 
         self.submodules.data = DacData(platform.request("dac_data"))
         self.comb += [
-            self.data.data_sync.eq(self.decoder.zoh.sample_mark),
+            # sync istr counter every frame
+            self.data.data_sync.eq(self.decoder.zoh.body_stb),
         ]
         for i in range(2):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
@@ -182,6 +183,7 @@ class Phaser(Module):
 
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
+                self.crg.clk125_buf,
                 #self.link.phy.clk,
                 #ClockSignal(),
                 #ResetSignal(),
@@ -192,11 +194,13 @@ class Phaser(Module):
                 #self.link.unframe.marker_stb,
                 #self.link.unframe.end_of_frame,
                 self.link.checker.frame_stb,
-                self.decoder.bus.bus.we,
-                self.decoder.bus.bus.re,
-                self.decoder.bus.bus.adr[0],
+                # self.decoder.bus.bus.we,
+                # self.decoder.bus.bus.re,
+                # self.decoder.bus.bus.adr[0],
                 self.link.checker.miso,
-                #self.data.data_sync
+                # self.data.data_sync,
+                self.data.istr,
+                dac_ctrl.alarm,
             ))
         ]
 

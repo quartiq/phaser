@@ -23,6 +23,7 @@ class DacData(Module):
             Signal(16, reset_less=True) for _ in range(2)
             ] for _ in range(4)]
 
+        # buffer for parity calculation
         words = [[Signal.like(di) for di in d] for d in self.data]
         self.sync += Cat(words).eq(Cat(self.data))
 
@@ -41,11 +42,12 @@ class DacData(Module):
 
         # 1/4 cycle (90 deg) delayed clock to have the rising edge on the
         # A/C sample without tweaking delays
+        # attr={("SLEW", "FAST")}
         self._oserdes([1, 0, 1, 0], pins.data_clk_p, pins.data_clk_n, "sys2q")
 
         # SYNC for PLL N divider, to dac_clk, not needed if N=1
         # for write pointer reset, to data_clk not needed
-        # self._oserdes([self.istr]*4, pins.sync_p, pins.sync_n)
+        self._oserdes([0]*4, pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
         self._oserdes([self.istr, 0, 0, 0],
@@ -57,20 +59,20 @@ class DacData(Module):
         # external read pointer reset, to dac_clk*interpolation, not needed
         # self._oserdes([0, 0, 0, 0], pins.ostr_p, pins.ostr_n)
 
-        for i, port in enumerate([
+        for i_port, port in enumerate([
                 (pins.data_a_p, pins.data_a_n),
                 (pins.data_b_p, pins.data_b_n)]):
-            for j, pin in enumerate(zip(*port)):
-                bits = [words[k][i][j] for k in range(4)]
-                if (i, j) in swap:  # sinara-hw/Phaser#102
+            for i_pin, pin in enumerate(zip(*port)):
+                bits = [words[i_word][i_port][i_pin] for i_word in range(4)]
+                if (i_port, i_pin) in swap:  # sinara-hw/Phaser#102
                     bits = [~_ for _ in bits]
                     pin = pin[::-1]
                 self._oserdes(bits, pin[0], pin[1])
 
-    def _oserdes(self, data, pin_p, pin_n, clk="sys2"):
+    def _oserdes(self, data, pin_p, pin_n, clk="sys2", attr=set()):
         pin = Signal()
         self.specials += [
-            Instance("OSERDESE2",
+            Instance("OSERDESE2", attr=attr,
                 p_DATA_RATE_OQ="DDR", p_DATA_RATE_TQ="BUF",
                 p_DATA_WIDTH=4, p_TRISTATE_WIDTH=1,
                 i_RST=ResetSignal(),
