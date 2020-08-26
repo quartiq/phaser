@@ -1,7 +1,14 @@
-# Phaser DSP design
+# Phaser gateware
 
-This repository contains some sketches and calculations on the Phaser DSP
-design.
+This repository contains the gateware for the Phaser 4 channel 1 GS/s DAC arbitrary waveform generator.
+
+Funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://github.com/OregonIons), [MITLL](https://www.ll.mit.edu/biographies/jeremy-m-sage), [QUARTIQ](https://github.com/quartiq).
+
+## Hardware
+
+The hardware design repository is over at [Sinara](https://github.com/sinara-hw/Phaser).
+
+## DSP designs
 
 [NBViewer link](https://nbviewer.jupyter.org/github/quartiq/phaser/tree/master/)
 
@@ -10,12 +17,6 @@ design.
   cascade, analysis of other interpolator approaches, comparison of
   CIC/HBF/FIR, CIC droop compensation filter
 * [cic](https://nbviewer.jupyter.org/github/quartiq/phaser/blob/master/cic.ipynb): ideas for CIC implementations and tests of interpolation modes
-
-funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://github.com/OregonIons), [MITLL](https://www.ll.mit.edu/biographies/jeremy-m-sage)
-
-## Hardware
-
-https://github.com/sinara-hw/Phaser
 
 ## Getting started
 
