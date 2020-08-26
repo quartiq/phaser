@@ -112,7 +112,8 @@ class Phaser(Module):
             self.decoder.get("sta", "read").eq(Cat(
                 dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
                 adc_ctrl.term_stat, self.spi.idle)),
-            self.spi.reg.pdo.eq(self.decoder.get("spi_datw", "write")),
+            self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
+            self.spi.reg.pdo.eq(self.decoder.registers["spi_datw"][0].bus.dat_w),
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
             # self.spi.readable, self.spi.writable, self.spi.idle,
             self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
@@ -129,10 +130,6 @@ class Phaser(Module):
             self.spiint.sample.eq(self.spi.reg.sample),
             self.spi.reg.sdi.eq(self.spiint.sdi),
             self.spiint.sdo.eq(self.spi.reg.sdo),
-        ]
-        self.sync += [
-            # load on write
-            self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
         ]
 
         self.submodules.data = DacData(platform.request("dac_data"))
@@ -170,7 +167,8 @@ class Phaser(Module):
 
             self.sync += [
                 If(cfg[2:4] == 1,
-                    Cat([d[i] for d in self.data.data]).eq(Replicate(
+                    # i is msb, q is lsb
+                    Cat(reversed([d[i] for d in self.data.data])).eq(Replicate(
                         self.decoder.get("dac{}_test".format(i), "write"), 2))
                 )
             ]

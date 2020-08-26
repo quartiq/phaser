@@ -25,16 +25,19 @@ class DacData(Module):
 
         # buffer for parity calculation
         words = [[Signal.like(di) for di in d] for d in self.data]
-        self.sync += Cat(words).eq(Cat(self.data))
-
         par = Signal(len(self.data), reset_less=True)
-        self.sync += par.eq(Cat([parity(*word) for word in self.data]))
 
         i = Signal(max=4, reset_less=True)
         self.istr = Signal(reset_less=True)
+
+        # make this sync to relax timing
+        self.comb += [
+            Cat(words).eq(Cat(self.data)),
+            par.eq(Cat([parity(*word) for word in self.data])),
+            self.istr.eq(i == 0),
+        ]
         self.sync += [
             i.eq(i + 1),
-            self.istr.eq(i == 0),
             If(self.data_sync,
                 i.eq(0),
             ),
