@@ -1,10 +1,10 @@
 from migen import *
 from misoc.cores.spi2 import SPIMachine, SPIInterface
+from misoc.cores.duc import PhasedDUC
 
 from crg import CRG
 from link import Link
 from decode import Decode, Register
-from duc import PhasedDUC
 from dac_data import DacData
 
 
@@ -114,7 +114,6 @@ class Phaser(Module):
                 adc_ctrl.term_stat, self.spi.idle)),
             self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
             self.spi.reg.pdo.eq(self.decoder.registers["spi_datw"][0].bus.dat_w),
-            self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
             # self.spi.readable, self.spi.writable, self.spi.idle,
             self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
             self.spiint.cs_polarity.eq(0),  # all active low
@@ -130,6 +129,10 @@ class Phaser(Module):
             self.spiint.sample.eq(self.spi.reg.sample),
             self.spi.reg.sdi.eq(self.spiint.sdi),
             self.spiint.sdo.eq(self.spi.reg.sdo),
+        ]
+        # relax timing on this one
+        self.sync += [
+            self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
         self.submodules.data = DacData(platform.request("dac_data"))

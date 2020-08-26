@@ -1,8 +1,7 @@
 from collections import OrderedDict
 
 from migen import *
-
-from duc import complex
+from misoc.cores.duc import complex
 
 
 header_layout = [
@@ -28,12 +27,14 @@ class SampleMux(Module):
         self.body_stb = Signal()
         self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
         self.sample_stb = Signal()
-        samples = [Signal(b_sample*2*n_channel, reset_less=True) for _ in range(n_mux)]
+        samples = [Signal(b_sample*2*n_channel, reset_less=True)
+                   for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
         i = Signal(max=n_mux, reset_less=True)  # body pointer
         j = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
-            Cat([_.raw_bits() for _ in self.sample]).eq(Array(samples)[i]),
+            Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
+                Array(samples)[i]),
         ]
         self.sync += [
             j.eq(j + 1),
