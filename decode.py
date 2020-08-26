@@ -33,7 +33,7 @@ class SampleMux(Module):
         i = Signal(max=n_mux, reset_less=True)  # body pointer
         j = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
-            Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
+            Cat([(_.q[-b_sample:], _.i[-b_sample:]) for _ in self.sample]).eq(
                 Array(samples)[i]),
         ]
         self.sync += [
