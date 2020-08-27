@@ -4,7 +4,6 @@ import unittest
 from migen import *
 
 import link
-from crc import CRC
 
 
 class TestSlip(unittest.TestCase):
@@ -151,8 +150,7 @@ class TestUnframe(unittest.TestCase):
         run_simulation(self.dut,
             [self.feed_bits(frame),
              self.record_frame(bits),
-             self.record_check(rec_frame)],
-            vcd_name="link.vcd")
+             self.record_check(rec_frame)])
         self.assertEqual(len(bits), 10*8)
         #self.assertEqual(bits[-8 - 1], 0x3f)
         self.assertEqual(len(rec_frame), 1)
