@@ -27,10 +27,11 @@ class Phy(Module):
             buf = Signal()
             dly = Signal()
             thru = Signal()
-            # ("IBUF_LOW_PWR", "FALSE")
+            attr = {("DIFF_TERM", "TRUE")}
+            if i == 0:
+                attr.add(("IBUF_LOW_PWR", "FALSE"))
             self.specials += [
-                Instance("IBUFGDS" if i == 0 else "IBUFDS",
-                    attr={("DIFF_TERM", "TRUE")},
+                Instance("IBUFGDS" if i == 0 else "IBUFDS", attr=attr,
                     i_I=getattr(eem, "data{}_p".format(i)),
                     i_IB=getattr(eem, "data{}_n".format(i)),
                     o_O=buf),
@@ -47,7 +48,7 @@ class Phy(Module):
                 Instance("ISERDESE2",
                     p_DATA_RATE="DDR", p_DATA_WIDTH=4,
                     p_INTERFACE_TYPE="NETWORKING", p_NUM_CE=1,
-                    p_IOBDELAY="NONE",  #"IFD",
+                    p_IOBDELAY="IFD",
                     i_D=buf, i_DDLY=dly,
                     i_BITSLIP=self.bitslip,
                     i_CLK=ClockSignal("sys2"), i_CLKB=~ClockSignal("sys2"),
