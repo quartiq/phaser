@@ -162,7 +162,7 @@ class Phaser(Module):
                     ji.q[2:].eq(self.decoder.zoh.sample[i].q),
                 ]
                 self.sync += [
-                    If(cfg[2:4] == 0,
+                    If(cfg[2:4] == 0,  # ducx_cfg_sel
                         self.data.data[2*j][i].eq(jo.i),
                         self.data.data[2*j + 1][i].eq(jo.q),
                     )
@@ -170,25 +170,25 @@ class Phaser(Module):
 
             self.sync += [
                 If(cfg[2:4] == 1,
-                    # i is msb, q is lsb
-                    Cat(reversed([d[i] for d in self.data.data])).eq(Replicate(
+                    # i is lsb, q is msb
+                    Cat([d[i] for d in self.data.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(i), "write"), 2))
                 )
             ]
         self.comb += [
-            self.decoder.get("dac0_data", "read").eq(Cat([
-                d[0] for d in self.data.data])),
-            self.decoder.get("dac1_data", "read").eq(Cat([
-                d[1] for d in self.data.data])),
+            self.decoder.get("dac0_data", "read").eq(Cat(
+                self.data.data[0][0], self.data.data[1][0])),
+            self.decoder.get("dac1_data", "read").eq(Cat(
+                self.data.data[0][1], self.data.data[1][1])),
         ]
 
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
                 self.crg.clk125_buf,
-                #self.link.phy.clk,
+                self.link.phy.clk,
                 #ClockSignal(),
-                #ResetSignal(),
-                #self.link.slip.bitslip,
+                ResetSignal(),
+                self.link.slip.bitslip,
                 #self.link.unframe.data[0],
                 #self.link.unframe.data[1],
                 #self.link.unframe.clk_stb,
@@ -200,8 +200,8 @@ class Phaser(Module):
                 # self.decoder.bus.bus.adr[0],
                 self.link.checker.miso,
                 # self.data.data_sync,
-                self.data.istr,
-                dac_ctrl.alarm,
+                # self.data.istr,
+                # dac_ctrl.alarm,
             ))
         ]
 

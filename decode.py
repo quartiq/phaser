@@ -23,31 +23,31 @@ class SampleMux(Module):
     def __init__(self, b_sample, n_channel, n_mux, t_frame):
         n_interp, n_rest = divmod(t_frame, n_mux)
         assert n_rest == 0
-        self.body = Signal(b_sample*2*n_channel*n_mux)
+        self.body = Signal(n_mux*n_channel*2*b_sample)
         self.body_stb = Signal()
         self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
         self.sample_stb = Signal()
-        samples = [Signal(b_sample*2*n_channel, reset_less=True)
+        samples = [Signal(n_channel*2*b_sample, reset_less=True)
                    for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
-        i = Signal(max=n_mux, reset_less=True)  # body pointer
-        j = Signal(max=n_interp, reset_less=True)  # interpolation
+        i_sample = Signal(max=n_mux, reset_less=True)  # body pointer
+        i_interp = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
-            Cat([(_.q[-b_sample:], _.i[-b_sample:]) for _ in self.sample]).eq(
-                Array(samples)[i]),
+            Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
+                Array(samples)[i_sample]),
         ]
         self.sync += [
-            j.eq(j + 1),
+            i_interp.eq(i_interp - 1),
             self.sample_stb.eq(0),
-            If(j == n_interp - 1,
-                j.eq(0),
-                i.eq(i + 1),
+            If(i_interp == 0,
+                i_interp.eq(n_interp - 1),
+                i_sample.eq(i_sample - 1),
                 self.sample_stb.eq(1),
             ),
             If(self.body_stb,
                 Cat(samples).eq(self.body),
-                i.eq(0),
-                j.eq(0),
+                i_sample.eq(n_mux - 1),  # early sample is most significant
+                i_interp.eq(n_interp - 1),
             )
         ]
 
