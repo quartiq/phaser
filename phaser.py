@@ -53,7 +53,7 @@ class Phaser(Module):
             ("duc_stb", Register(write=False, read=False)),
             ("adc_cfg", Register(width=4)),
             ("spi_cfg", Register()),
-            ("spi_div", Register()),
+            ("spi_divlen", Register()),
             ("spi_sel", Register()),
             ("spi_datw", Register(read=False)),
             ("spi_datr", Register(write=False)),
@@ -117,8 +117,8 @@ class Phaser(Module):
             # self.spi.readable, self.spi.writable, self.spi.idle,
             self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
             self.spiint.cs_polarity.eq(0),  # all active low
-            self.spi.length.eq(8 - 1),  # always
-            self.spi.cg.div.eq(self.decoder.get("spi_div", "write")),
+            Cat(self.spi.cg.div[3:], self.spi.length).eq(
+                self.decoder.get("spi_divlen", "write")),
             Cat(self.spiint.offline, self.spi.end,
                 self.spi.clk_phase, self.spiint.clk_polarity,
                 self.spiint.half_duplex, self.spi.reg.lsb_first).eq(
@@ -184,11 +184,11 @@ class Phaser(Module):
 
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
-                self.crg.clk125_buf,
-                self.link.phy.clk,
+                ClockSignal("clk125"),
+                ClockSignal("link"),
                 #ClockSignal(),
                 ResetSignal(),
-                self.link.slip.bitslip,
+                #self.link.slip.bitslip,
                 #self.link.unframe.data[0],
                 #self.link.unframe.data[1],
                 #self.link.unframe.clk_stb,
@@ -201,7 +201,7 @@ class Phaser(Module):
                 self.link.checker.miso,
                 # self.data.data_sync,
                 # self.data.istr,
-                # dac_ctrl.alarm,
+                dac_ctrl.alarm,
             ))
         ]
 
