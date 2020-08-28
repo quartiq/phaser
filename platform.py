@@ -117,6 +117,7 @@ _ios = [
         IOStandard("LVCMOS33")
     ),
 
+    # cnv, sdob, sck: p-n swapped on pcb
     ("adc", 0,
         Subsignal("sck_n", Pins("N22")),
         Subsignal("sck_p", Pins("M22")),
@@ -193,6 +194,7 @@ _ios = [
         IOStandard("LVCMOS33")
     ),
 
+    # A3, B8: p-n swapped on pcb
     ("dac_data", 0,
         Subsignal("data_a_n", Pins(
             "F20 D19 E18 C22 C17 A19 E17 D21 "
