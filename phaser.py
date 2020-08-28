@@ -10,7 +10,7 @@ from dac_data import DacData
 
 class PWM(Module):
     def __init__(self, pin):
-        cnt = Signal(10, reset_less=True)
+        cnt = Signal(12, reset_less=True)
         self.duty = Signal.like(cnt)
         self.sync += [
             cnt.eq(cnt + 1),
@@ -42,37 +42,67 @@ class Phaser(Module):
 
         self.decoder.map_registers([
             (0x00,),
-            ("id", Register(write=False)),
+            # Sinara board id (19) as assigned in the Sinara EEPROM layout
+            ("board_id", Register(write=False)),
+            # hardware revision and variant
             ("hw_rev", Register(write=False)),
+            # gateware revision
             ("gw_rev", Register(write=False)),
+            # configuration (clk_sel, dac_resetb, dac_sleep,
+            # dac_txena, trf0_ps, trf1_ps, att0_rstn, att1_rstn)
             ("cfg", Register()),
+            # status (dac_alarm, trf0_ld, trf1_ld, term0_stat,
+            # term1_stat, spi_idle)
             ("sta", Register(write=False)),
+            # frame crc error counter
             ("crc_err", Register(write=False)),
+            # led configuration
             ("led", Register(width=6)),
+            # fan pwm duty cycle
             ("fan", Register()),
+            # DUC settings update strobe
             ("duc_stb", Register(write=False, read=False)),
+            # ADC gain configuration (pgia0_gain, pgia1_gain)
             ("adc_cfg", Register(width=4)),
+            # spi configuration (offline, end, clk_phase, clk_polarity,
+            # half_duplex, lsb_first)
             ("spi_cfg", Register()),
+            # spi divider and transaction length (div(5), len(3))
             ("spi_divlen", Register()),
+            # spi chip select (dac, trf0, trf1, att0, att1)
             ("spi_sel", Register()),
+            # spi mosi data and transaction start/continue
             ("spi_datw", Register(read=False)),
+            # spi readback data, available after each transaction
             ("spi_datr", Register(write=False)),
             ("reserved0", Register(read=False, write=False)),
             (0x10,),
+            # digital upconverter (duc) configuration
+            # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
             ("duc0_cfg", Register()),
             ("duc0_reserved", Register(read=False, write=False)),
+            # duc frequency tuning word (msb first)
             ("duc0_f", Register(), Register(), Register(), Register()),
+            # duc phase offset word
             ("duc0_p", Register(), Register()),
+            # dac data
             ("dac0_data", Register(write=False), Register(write=False),
                           Register(write=False), Register(write=False)),
+            # dac test data for duc_cfg:data_select == 1
             ("dac0_test", Register(), Register(), Register(), Register()),
             (0x20,),
+            # digital upconverter (duc) configuration
+            # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
             ("duc1_cfg", Register()),
             ("duc1_reserved", Register(read=False, write=False)),
+            # duc frequency tuning word (msb first)
             ("duc1_f", Register(), Register(), Register(), Register()),
+            # duc phase offset word
             ("duc1_p", Register(), Register()),
+            # dac data
             ("dac1_data", Register(write=False), Register(write=False),
                           Register(write=False), Register(write=False)),
+            # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
         ])
 
@@ -81,7 +111,7 @@ class Phaser(Module):
         att_rstn = [platform.request("att_rstn") for _ in range(2)]
         adc_ctrl = platform.request("adc_ctrl")
         self.comb += [
-            self.decoder.get("id", "read").eq(19),  # Sinara.boards.index("Phaser")
+            self.decoder.get("board_id", "read").eq(19),  # Sinara.boards.index("Phaser")
             self.decoder.get("hw_rev", "read").eq(Cat(
                 platform.request("hw_rev"), platform.request("hw_variant"))),
             self.decoder.get("gw_rev", "read").eq(0x01),
