@@ -10,7 +10,7 @@ from dac_data import DacData
 
 class PWM(Module):
     def __init__(self, pin):
-        cnt = Signal(12, reset_less=True)
+        cnt = Signal(10, reset_less=True)
         self.duty = Signal.like(cnt)
         self.sync += [
             cnt.eq(cnt + 1),
@@ -27,15 +27,20 @@ class Phaser(Module):
     def __init__(self, platform):
         eem = platform.request("eem", 0)
         self.submodules.link = Link(eem)
-        self.submodules.crg = CRG(platform, link=self.link.phy.clk)
+        # Set up the CRG to clock everything from the link clock
+        # This avoids CDCs and latency variation. All latency variation is
+        # buffered by the DAC EB and compensated for by it's reset mechanism.
         platform.add_period_constraint(eem.data0_p, 4.*8)
+        self.submodules.crg = CRG(platform, link=self.link.phy.clk)
+        # Don't bother meeting s/h for the clk iserdes. We align it.
         platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
         self.submodules.decoder = Decode(
             b_sample=14, n_channel=2, n_mux=8, t_frame=8*10)
         self.comb += [
             self.decoder.frame.eq(self.link.checker.frame),
             self.decoder.stb.eq(self.link.checker.frame_stb),
-            # 2 miso bits max rtt latency
+            # Send the 8 bit response early (msb aligned) and slowly (/8)
+            # This gives 2 miso bits max rtt latency
             Cat(self.link.checker.response[2*8:]).eq(
                 Cat([Replicate(d, 8) for d in self.decoder.response])),
         ]
@@ -183,10 +188,13 @@ class Phaser(Module):
                         duc.clr.eq(1),
                     ),
                     duc.f.eq(self.decoder.get("duc{}_f".format(i), "write")),
-                    duc.p[2:].eq(self.decoder.get("duc{}_p".format(i), "write")),
+                    # msb align to 19 bit duc.p
+                    duc.p[3:].eq(
+                        self.decoder.get("duc{}_p".format(i), "write")),
                 ),
             ]
             for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
+                # msb align 14 bit data to 16 bit duc
                 self.comb += [
                     ji.i[2:].eq(self.decoder.zoh.sample[i].i),
                     ji.q[2:].eq(self.decoder.zoh.sample[i].q),
@@ -199,19 +207,22 @@ class Phaser(Module):
                 ]
 
             self.sync += [
-                If(cfg[2:4] == 1,
+                If(cfg[2:4] == 1,  # ducx_cfg_sel
                     # i is lsb, q is msb
+                    # just repeat the test data
                     Cat([d[i] for d in self.data.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(i), "write"), 2))
                 )
             ]
         self.comb += [
+            # even samples
             self.decoder.get("dac0_data", "read").eq(Cat(
-                self.data.data[0][0], self.data.data[1][0])),
+                d[0] for d in self.data.data)),
             self.decoder.get("dac1_data", "read").eq(Cat(
-                self.data.data[0][1], self.data.data[1][1])),
+                d[1] for d in self.data.data)),
         ]
 
+        # use liberally for debugging
         self.comb += [
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
                 ClockSignal("clk125"),

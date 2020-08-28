@@ -13,7 +13,8 @@ def parity(*x):
 # then use dual-source-sync: internal OSTR resets read side
 # ISTR (SDR) resets write side
 # clock DSP, data_clk from the sample data
-# synchronize frame marker to frame processing and to data_sync
+# synchronize frame marker to frame processing and to data_sync and thus to
+# ISTR
 
 class DacData(Module):
     def __init__(self, pins, swap=((0, 3), (1, 8))):
@@ -27,19 +28,19 @@ class DacData(Module):
         words = [[Signal.like(di) for di in d] for d in self.data]
         par = Signal(len(self.data), reset_less=True)
 
-        i = Signal(max=4, reset_less=True)
+        i = Signal(4, reset_less=True)
         self.istr = Signal(reset_less=True)
 
         # make this sync to relax timing
         self.comb += [
             Cat(words).eq(Cat(self.data)),
             par.eq(Cat([parity(*word) for word in self.data])),
-            self.istr.eq(i == 0),
+            self.istr.eq(i[-1]),
         ]
         self.sync += [
-            i.eq(i + 1),
+            i.eq(Cat(i[-1], i)),
             If(self.data_sync,
-                i.eq(0),
+                i.eq(0b1000),
             ),
         ]
 
@@ -48,8 +49,8 @@ class DacData(Module):
         # attr={("SLEW", "FAST")}
         self._oserdes([1, 0, 1, 0], pins.data_clk_p, pins.data_clk_n, "sys2q")
 
-        # SYNC for PLL N divider, to dac_clk, not needed if N=1
-        # for write pointer reset, to data_clk not needed
+        # SYNC for PLL N divider which generates internal fifo write pointer
+        # reset OSTR, timed to dac_clk!, not needed if N=1
         self._oserdes([0]*4, pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
@@ -59,7 +60,8 @@ class DacData(Module):
         # 32 bit parity
         self._oserdes(par, pins.paritycd_p, pins.paritycd_n)
 
-        # external read pointer reset, to dac_clk*interpolation, not needed
+        # external read pointer reset, timed to dac_clk*interpolation,
+        # not needed here
         # self._oserdes([0, 0, 0, 0], pins.ostr_p, pins.ostr_n)
 
         for i_port, port in enumerate([
