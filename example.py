@@ -32,9 +32,9 @@ class Phaser(EnvExperiment):
         f.set_leds(0x3f)
         f.set_cfg(dac_resetb=0, att0_rstn=0, att1_rstn=0)  # reset dac
         f.set_cfg()
-        f.set_fan(16)
-        # assert f.get_crc_err() == 0
-        # delay(.1*ms)
+        f.set_fan(90)
+        assert f.get_crc_err() < 10  # startup errors
+        delay(.1*ms)
 
         delay(.5*ms)
         # test att write read
@@ -142,11 +142,11 @@ class Phaser(EnvExperiment):
             for osc in range(5):
                 ftw = ((osc + 1) << 28) + 0x1234567
                 asf = (osc + 1) << 11
-                if osc != 4:
-                    asf = 0
-                else:
-                    asf = 0x7fff
-                    ftw = 0x0  #1234567
+                #if osc != 4:
+                #    asf = 0
+                #else:
+                #    asf = 0x7fff
+                #    ftw = 0x0  #1234567
                 f.set_frequency_mu(ch, osc, ftw)
                 delay(1*us)
                 f.set_amplitude_phase_mu(ch, osc, asf=asf,
