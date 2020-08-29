@@ -289,7 +289,7 @@ class Test(Module):
 
 
 if __name__ == "__main__":
-    from platform import Platform
+    from phaser_platform import Platform
     from crg import CRG
     platform = Platform(load=False)
     test = Test(platform)

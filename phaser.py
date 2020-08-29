@@ -248,7 +248,7 @@ class Phaser(Module):
 
 
 if __name__ == "__main__":
-    from platform import Platform
+    from phaser_platform import Platform
     platform = Platform(load=True)
     test = Phaser(platform)
     platform.build(test, build_name="phaser")
