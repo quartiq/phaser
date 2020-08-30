@@ -31,8 +31,8 @@ class Phaser(EnvExperiment):
         f.init()
         f.set_leds(0x3f)
         f.set_cfg(dac_resetb=0, att0_rstn=0, att1_rstn=0)  # reset dac
-        f.set_cfg()
-        f.set_fan(90)
+        f.set_cfg(clk_sel=1)
+        f.set_fan(80)
         assert f.get_crc_err() < 10  # startup errors
         delay(.1*ms)
 
@@ -175,5 +175,5 @@ class Phaser(EnvExperiment):
                 self.p(r)
                 self.core.break_realtime()
 
-        f.set_cfg(dac_resetb=1, dac_sleep=1, trf0_ps=1, trf1_ps=1)
+        f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
         self.core.wait_until_mu(now_mu())
