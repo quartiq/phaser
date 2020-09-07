@@ -46,7 +46,7 @@ class SampleMux(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
-        # FIXME: center tap, gain 125/128
+        # FIXME: center tap!, add gain 2**7/5**(4-1) in ciccomp, shifts
         self.submodules.ciccomp = SymMACFIR(3)
         for i, ci in enumerate([263, -5, 1]):
             self.ciccomp.coeff.sr[i].reset = ci
@@ -60,7 +60,7 @@ class InterpolateChannel(Module):
         self.input = self.ciccomp.sample.load
         self.output = self.cic.output
         self.comb += [
-            self.ciccomp.out.connect(self.hbf0.sample.load),
-            self.hbf0.out.connect(self.hbf1.sample.load),
-            self.hbf1.out.connect(self.cic.input),
+            self.ciccomp.out.connect(self.hbf0.input),
+            self.hbf0.output.connect(self.hbf1.input),
+            self.hbf1.output.connect(self.cic.input),
         ]

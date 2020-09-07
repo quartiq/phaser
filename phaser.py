@@ -170,15 +170,15 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
-        self.submodules.data = DacData(platform.request("dac_data"))
+        self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
-            self.data.data_sync.eq(self.decoder.stb),
+            self.dac.data_sync.eq(self.decoder.stb),
         ]
-        for i in range(2):
+        for ch in range(2):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
-            cfg = self.decoder.get("duc{}_cfg".format(i), "write")
+            cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
             self.sync += [
                 # keep accu cleared
                 duc.clr.eq(cfg[0]),
@@ -187,22 +187,22 @@ class Phaser(Module):
                     If(cfg[1],
                         duc.clr.eq(1),
                     ),
-                    duc.f.eq(self.decoder.get("duc{}_f".format(i), "write")),
+                    duc.f.eq(self.decoder.get("duc{}_f".format(ch), "write")),
                     # msb align to 19 bit duc.p
                     duc.p[3:].eq(
-                        self.decoder.get("duc{}_p".format(i), "write")),
+                        self.decoder.get("duc{}_p".format(ch), "write")),
                 ),
             ]
-            for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
+            for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
                 # msb align 14 bit data to 16 bit duc
                 self.comb += [
-                    ji.i.eq(self.decoder.dac_data[j][i].i),
-                    ji.q.eq(self.decoder.dac_data[j][i].q),
+                    ti.i.eq(self.decoder.data[t][ch].i),
+                    ti.q.eq(self.decoder.data[t][ch].q),
                 ]
                 self.sync += [
                     If(cfg[2:4] == 0,  # ducx_cfg_sel
-                        self.data.data[2*j][i].eq(jo.i),
-                        self.data.data[2*j + 1][i].eq(jo.q),
+                        self.dac.data[2*t][ch].eq(to.i),
+                        self.dac.data[2*t + 1][ch].eq(to.q),
                     )
                 ]
 
@@ -210,16 +210,16 @@ class Phaser(Module):
                 If(cfg[2:4] == 1,  # ducx_cfg_sel
                     # i is lsb, q is msb
                     # just repeat the test data
-                    Cat([d[i] for d in self.data.data]).eq(Replicate(
-                        self.decoder.get("dac{}_test".format(i), "write"), 2))
+                    Cat([d[ch] for d in self.dac.data]).eq(Replicate(
+                        self.decoder.get("dac{}_test".format(ch), "write"), 2))
                 )
             ]
         self.comb += [
             # even samples
             self.decoder.get("dac0_data", "read").eq(Cat(
-                d[0] for d in self.data.data)),
+                d[0] for d in self.dac.data)),
             self.decoder.get("dac1_data", "read").eq(Cat(
-                d[1] for d in self.data.data)),
+                d[1] for d in self.dac.data)),
         ]
 
         # use liberally for debugging
@@ -240,8 +240,8 @@ class Phaser(Module):
                 # self.decoder.bus.bus.re,
                 # self.decoder.bus.bus.adr[0],
                 self.link.checker.miso,
-                # self.data.data_sync,
-                # self.data.istr,
+                # self.dac.data_sync,
+                # self.dac.istr,
                 dac_ctrl.alarm,
             ))
         ]

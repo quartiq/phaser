@@ -153,22 +153,20 @@ class Decode(Module):
         ]
 
         self.interpolate = []
-        self.dac_data = [[Record(complex(16)) for _ in range(n_channel)]
+        self.data = [[Record(complex(16)) for _ in range(n_channel)]
                          for _ in range(2)]
-        for i in range(4):
-            iq = "iq"[i & 1]
-            ch = i // 2
-            inter = InterpolateChannel()
-            self.submodules += inter
-            self.interpolate.append(inter)
-            self.comb += [
-                inter.input.stb.eq(self.zoh.sample_stb),
-                inter.input.data[-b_sample:].eq(
-                    getattr(self.zoh.sample[ch], iq)),
-                getattr(self.dac_data[0][ch], iq).eq(inter.output.data0),
-                getattr(self.dac_data[1][ch], iq).eq(inter.output.data1),
-                inter.output.ack.eq(1),
-            ]
+        for ch in range(n_channel):
+            for iq in "iq":
+                inter = InterpolateChannel()
+                self.submodules += inter
+                self.interpolate.append(inter)
+                self.comb += [
+                    inter.input.data.eq(getattr(self.zoh.sample[ch], iq)),
+                    inter.input.stb.eq(self.zoh.sample_stb),
+                    getattr(self.data[0][ch], iq).eq(inter.output.data0),
+                    getattr(self.data[1][ch], iq).eq(inter.output.data1),
+                    inter.output.ack.eq(1),
+                ]
 
         self.submodules.bus = Bus()
         self.comb += [
