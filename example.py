@@ -33,7 +33,7 @@ class Phaser(EnvExperiment):
         f.set_cfg(dac_resetb=0, att0_rstn=0, att1_rstn=0)  # reset dac
         f.set_cfg(clk_sel=1)
         f.set_fan(80)
-        assert f.get_crc_err() < 10  # startup errors
+        assert f.get_crc_err() < 20  # startup errors
         delay(.1*ms)
 
         delay(.5*ms)
@@ -149,7 +149,7 @@ class Phaser(EnvExperiment):
                 #    ftw = 0x0  #1234567
                 f.set_frequency_mu(ch, osc, ftw)
                 delay(1*us)
-                f.set_amplitude_phase_mu(ch, osc, asf=asf,
+                f.set_amplitude_phase_mu(ch, osc, asf,
                                          pow=0x0000, clr=0)
                 delay(1*us)
                 delay(.1*ms)
@@ -170,7 +170,7 @@ class Phaser(EnvExperiment):
             delay(.1*ms)
 
             for addr in range(8):
-                r = f.trf_read(ch=ch, addr=addr)
+                r = f.trf_read(ch, addr)
                 delay(.1*ms)
                 self.p(r)
                 self.core.break_realtime()
