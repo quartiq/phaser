@@ -173,7 +173,7 @@ class Phaser(Module):
         self.submodules.data = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
-            self.data.data_sync.eq(self.decoder.zoh.body_stb),
+            self.data.data_sync.eq(self.decoder.stb),
         ]
         for i in range(2):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
@@ -196,8 +196,8 @@ class Phaser(Module):
             for j, (ji, jo) in enumerate(zip(duc.i, duc.o)):
                 # msb align 14 bit data to 16 bit duc
                 self.comb += [
-                    ji.i[2:].eq(self.decoder.zoh.sample[i].i),
-                    ji.q[2:].eq(self.decoder.zoh.sample[i].q),
+                    ji.i.eq(self.decoder.dac_data[j][i].i),
+                    ji.q.eq(self.decoder.dac_data[j][i].q),
                 ]
                 self.sync += [
                     If(cfg[2:4] == 0,  # ducx_cfg_sel

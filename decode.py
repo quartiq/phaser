@@ -3,6 +3,8 @@ from collections import OrderedDict
 from migen import *
 from misoc.cores.duc import complex
 
+from interpolate import SampleMux, InterpolateChannel
+
 
 header_layout = [
     ("we", 1),
@@ -10,46 +12,6 @@ header_layout = [
     ("data", 8),
     ("type", 4)
 ]
-
-
-class SampleMux(Module):
-    """Zero order hold interpolator.
-
-    * `b_sample`: bits per sample (i or q)
-    * `n_channel`: iq dac channels
-    * `n_mux`: samples in a frame
-    * `t_frame`: clock cycles per frame
-    """
-    def __init__(self, b_sample, n_channel, n_mux, t_frame):
-        n_interp, n_rest = divmod(t_frame, n_mux)
-        assert n_rest == 0
-        self.body = Signal(n_mux*n_channel*2*b_sample)
-        self.body_stb = Signal()
-        self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
-        self.sample_stb = Signal()
-        samples = [Signal(n_channel*2*b_sample, reset_less=True)
-                   for _ in range(n_mux)]
-        assert len(Cat(samples)) == len(self.body)
-        i_sample = Signal(max=n_mux, reset_less=True)  # body pointer
-        i_interp = Signal(max=n_interp, reset_less=True)  # interpolation
-        self.comb += [
-            Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
-                Array(samples)[i_sample]),
-        ]
-        self.sync += [
-            i_interp.eq(i_interp - 1),
-            self.sample_stb.eq(0),
-            If(i_interp == 0,
-                i_interp.eq(n_interp - 1),
-                i_sample.eq(i_sample - 1),
-                self.sample_stb.eq(1),
-            ),
-            If(self.body_stb,
-                Cat(samples).eq(self.body),
-                i_sample.eq(n_mux - 1),  # early sample is most significant
-                i_interp.eq(n_interp - 1),
-            )
-        ]
 
 
 class SampleGearbox(Module):
@@ -189,6 +151,24 @@ class Decode(Module):
             self.zoh.body.eq(body),
             self.zoh.body_stb.eq(self.stb & (header.type == 1)),
         ]
+
+        self.interpolate = []
+        self.dac_data = [[Record(complex(16)) for _ in range(n_channel)]
+                         for _ in range(2)]
+        for i in range(4):
+            iq = "iq"[i & 1]
+            ch = i // 2
+            inter = InterpolateChannel()
+            self.submodules += inter
+            self.interpolate.append(inter)
+            self.comb += [
+                inter.input.stb.eq(self.zoh.sample_stb),
+                inter.input.data[-b_sample:].eq(
+                    getattr(self.zoh.sample[ch], iq)),
+                getattr(self.dac_data[0][ch], iq).eq(inter.output.data0),
+                getattr(self.dac_data[1][ch], iq).eq(inter.output.data1),
+                inter.output.ack.eq(1),
+            ]
 
         self.submodules.bus = Bus()
         self.comb += [
