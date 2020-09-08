@@ -1,6 +1,6 @@
 from migen import *
 from misoc.interconnect.stream import Endpoint
-from misoc.cores.fir import SymMACFIR, HBFMACUpsampler
+from misoc.cores.fir import MACFIR, HBFMACUpsampler
 from misoc.cores.cic import SuperCIC
 from misoc.cores.duc import complex
 
@@ -47,18 +47,19 @@ class SampleMux(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
-        # FIXME: center tap, scale 17
-        # ciccomp: cic droop and cic gain, rate 1/10 -> 1/10, gain 2**7/5**3
-        self.submodules.ciccomp = SymMACFIR(9)
-        for i, ci in enumerate([27, -100, 344, -1633, 69814, -1633, 344, -100, 27]):
+        # ciccomp: cic droop and gain, rate 1/10, gain 2**7/5**3, 9 taps
+        # maybe TODO: use symmetry for power
+        self.submodules.ciccomp = MACFIR(9, scale=16)
+        for i, ci in enumerate(
+                [30, -106, 351, -1642, 69821, -1642, 351, -106, 30]):
             self.ciccomp.coeff.sr[i].reset = ci
-        # hbf1: rate 1/10 -> 1/5, gain=1
+        # hbf1: rate 1/10 -> 1/5, gain=1, 39 taps
         self.submodules.hbf0 = HBFMACUpsampler(
             [-167, 0, 428, 0, -931, 0, 1776, 0, -3115, 0, 5185, 0, -8442, 0,
                 14028, 0, -26142, 0, 82873, 131072, 82873, 0, -26142, 0, 14028,
                 0, -8442, 0, 5185, 0, -3115, 0, 1776, 0, -931, 0, 428, 0,
                 -167])
-        # hbf1: rate 1/5 -> 2/5, gain=1
+        # hbf1: rate 1/5 -> 2/5, gain=1, 19 taps
         self.submodules.hbf1 = HBFMACUpsampler(
             [294, 0, -1865, 0, 6869, 0, -20436, 0, 80679, 131072, 80679, 0,
                 -20436, 0, 6869, 0, -1865, 0, 294])
@@ -66,16 +67,18 @@ class InterpolateChannel(Module):
         self.submodules.cic = SuperCIC(n=5, r=5, width=17)
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
-        # align to msb to save power, 14 bit plus one bit headroom
-        scale = len(self.ciccomp.sample.load.data) - (len(self.input.data) + 1)
+        # align MACs to MSB to save power
+        # 14 bit data plus 1 bit ciccomp headroom
+        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
+        scale_out = len(self.hbf1.output.data) - len(self.output.data0) - 1
         self.comb += [
             self.input.connect(self.ciccomp.sample.load, omit=["data"]),
-            self.ciccomp.sample.load.data.eq(self.input.data << scale),
+            self.ciccomp.sample.load.data.eq(self.input.data << scale_in),
             self.ciccomp.out.connect(self.hbf0.input),
             self.hbf0.output.connect(self.hbf1.input),
             self.hbf1.output.connect(self.cic.input, omit=["data"]),
             # maybe TODO: rounding bias
-            self.cic.input.data.eq(self.hbf1.output.data >> scale),
+            self.cic.input.data.eq(self.hbf1.output.data >> scale_out),
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
             # cic gain is r**(n-1) = 5**3, compensate with 2**-7,
             # the rest (2**7/5**3) is applied by ciccomp
