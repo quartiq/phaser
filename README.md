@@ -12,7 +12,7 @@ The hardware design repository is over at [Sinara](https://github.com/sinara-hw/
 
 [NBViewer link](https://nbviewer.jupyter.org/github/quartiq/phaser/tree/master/)
 
-* [half-hand-filter](https://nbviewer.jupyter.org/github/quartiq/phaser/blob/master/half-band-filter.ipynb):
+* [filter](https://nbviewer.jupyter.org/github/quartiq/phaser/blob/master/filter.ipynb):
   ideas and sketches for a 1/10 (samples per clock cycle) to 2/1 interpolator
   cascade, analysis of other interpolator approaches, comparison of
   CIC/HBF/FIR, CIC droop compensation filter
