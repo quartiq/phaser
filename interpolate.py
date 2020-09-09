@@ -47,11 +47,11 @@ class SampleMux(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
-        # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4, 9 taps
+        # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 < 1, 9 taps
         # maybe TODO: use symmetry for power
         self.submodules.ciccomp = MACFIR(9, scale=16)
         for i, ci in enumerate(
-                [30, -106, 351, -1642, 69821, -1642, 351, -106, 30]):
+                [24, -85, 281, -1314, 55856, -1314, 281, -85, 24]):
             self.ciccomp.coeff.sr[i].reset = ci
         # hbf1: rate 1/10 -> 1/5, gain=1, 39 taps
         self.submodules.hbf0 = HBFMACUpsampler(
@@ -64,13 +64,13 @@ class InterpolateChannel(Module):
             [294, 0, -1865, 0, 6869, 0, -20436, 0, 80679, 131072, 80679, 0,
                 -20436, 0, 6869, 0, -1865, 0, 294])
         # cic: rate 2/5 -> 2/1, gain=5**4
-        self.submodules.cic = SuperCIC(n=5, r=5, width=17)
+        self.submodules.cic = SuperCIC(n=5, r=5, width=16)
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
         # align MACs to MSB to save power
-        # 14 bit data plus 1 bit ciccomp headroom
-        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
-        scale_out = len(self.hbf1.output.data) - len(self.output.data0) - 1
+        # 14 bit data
+        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data)
+        scale_out = len(self.hbf1.output.data) - len(self.cic.input.data)
         self.comb += [
             self.input.connect(self.ciccomp.sample.load, omit=["data"]),
             self.ciccomp.sample.load.data.eq(self.input.data << scale_in),

@@ -44,7 +44,7 @@ class TestInter(unittest.TestCase):
 
     def test_seq(self):
         # impulse response plus latency
-        x = [1 << 10] + [0]*(30 + 10)
+        x = [(1 << 13) - 1] + [0]*(30 + 10)
         y = []
         run_simulation(self.dut, [feed(self.dut.input, x, rate=(1, 10)),
                                   retrieve(self.dut.output, y)],
