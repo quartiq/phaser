@@ -35,7 +35,7 @@ class DacData(Module):
         self.comb += [
             Cat(words).eq(Cat(self.data)),
             par.eq(Cat([parity(*word) for word in self.data])),
-            self.istr.eq(i[-1]),
+            self.istr.eq(i[0]),
         ]
         self.sync += [
             i.eq(Cat(i[-1], i)),
