@@ -93,22 +93,24 @@ class Phaser(EnvExperiment):
         f.dac_write(0x24, 0)
 
         delay(.5*ms)
-        f.dac_write(0x00, 0x019c)  # I=2, fifo, clkdiv_sync
+        f.dac_write(0x00, 0x019c)  # I=2, fifo, clkdiv_sync, qmc off
         f.dac_write(0x01, 0x040e)  # fifo alarms, parity
-        f.dac_write(0x02, 0x70f2)  # clk alarms, sif4, nco, mixer, mix_gain, 2s
+        f.dac_write(0x02, 0x70a2)  # clk alarms, sif4, nco off, mix, mix_gain, 2s
         f.dac_write(0x03, 0xa000)  # coarse dac 20.6 mA
         f.dac_write(0x07, 0x40c1)  # alarm mask
         f.dac_write(0x09, 0xa000)  # fifo_offset
-        f.dac_write(0x0d, 0x8000)  # cmix fs/8
-        f.dac_write(0x15, 0x1234)  # coarse nco
-        f.dac_write(0x17, 0x1234)  # coarse nco
+        f.dac_write(0x0d, 0x0000)  # fmix, no cmix
+        f.dac_write(0x14, 0x5431)  # fine nco ab
+        f.dac_write(0x15, 0x0323)  # coarse nco ab
+        f.dac_write(0x16, 0x5431)  # fine nco cd
+        f.dac_write(0x17, 0x0323)  # coarse nco cd
         f.dac_write(0x18, 0x2c60)  # P=4, pll run, single cp, pll_ndivsync
         f.dac_write(0x19, 0x8404)  # M=8 N=1
         f.dac_write(0x1a, 0xfc00)  # pll_vco=63
         delay(.1*ms)  # slack
         f.dac_write(0x1b, 0x0800)  # int ref, fuse
         f.dac_write(0x1e, 0x9999)  # qmc sync from sif and reg
-        f.dac_write(0x1f, 0x4400)  # mix sync, nco sync, istr is istr
+        f.dac_write(0x1f, 0x9982)  # mix sync, nco sync, istr is istr, sif_sync
         f.dac_write(0x20, 0x2400)  # fifo sync ISTR-OSTR
         f.dac_write(0x22, 0x1bb1)  # swap ab and cd dacs
         f.dac_write(0x24, 0x0000)  # clk and data delays
@@ -136,9 +138,9 @@ class Phaser(EnvExperiment):
             delay(.1*ms)
 
         for ch in range(2):
-            f.set_duc_frequency_mu(ch, 0x54321097)
+            f.set_duc_frequency_mu(ch, 0x1357911)
             f.set_duc_phase_mu(ch, 0x0000)
-            f.set_duc_cfg(ch)
+            f.set_duc_cfg(ch, select=0)
             for osc in range(5):
                 ftw = ((osc + 1) << 28) + 0x1234567
                 asf = (osc + 1) << 11
@@ -175,5 +177,5 @@ class Phaser(EnvExperiment):
                 self.p(r)
                 self.core.break_realtime()
 
-        f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
+        # f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
         self.core.wait_until_mu(now_mu())
