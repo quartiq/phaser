@@ -59,7 +59,7 @@ class CRG(Module):
                 p_CLKIN1_PERIOD=8. if link is None else 4.*8,
                 p_CLKFBOUT_MULT_F=8 if link is None else 4*8,
                 p_DIVCLK_DIVIDE=1,
-                i_CLKIN1=self.cd_clk125 if link is None else link,
+                i_CLKIN1=self.cd_clk125.clk if link is None else link,
                 i_CLKFBIN=self.cd_fb.clk, o_CLKFBOUT=fb,
                 o_LOCKED=locked,
                 # p_CLKOUT0_DIVIDE_F=4, p_CLKOUT0_PHASE=0, o_CLKOUT0=sys,
