@@ -213,6 +213,7 @@ class Checker(Module):
         assert len(Cat(frame_parts)) == len(self.frame)
         self.comb += self.frame.eq(Cat(frame_parts))
 
+        # TODO: prepend 1 start marker and ensure 0 trailing
         response_sr = Signal.like(self.response)
         self.comb += self.miso.eq(response_sr[-1])
         self.sync += [

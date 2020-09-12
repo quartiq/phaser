@@ -67,8 +67,7 @@ class InterpolateChannel(Module):
         self.submodules.cic = SuperCIC(n=5, r=5, width=16)
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
-        # align MACs to MSB to save power
-        # 14 bit data, one bit headroom
+        # align MACs to MSB to save power, keep one bit headroom
         scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
         scale_out = len(self.hbf1.output.data) - len(self.cic.input.data) - 1
         self.comb += [
@@ -78,13 +77,13 @@ class InterpolateChannel(Module):
             self.hbf0.output.connect(self.hbf1.input),
             self.hbf1.output.connect(self.cic.input, omit=["data"]),
             self.cic.input.data.eq((self.hbf1.output.data >> scale_out) +
-                ((1 << scale_out - 1) - 1)),
+                ((1 << scale_out - 1) - 1)),  # round half down bias
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
             # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
             # the rest (2**9/5**4) is applied by ciccomp
             # maybe TODO: clipping
             self.output.data0.eq((self.cic.output.data0 >> 9) +
-                ((1 << 9 - 1) - 1)),
+                ((1 << 9 - 1) - 1)),  # tound half down bias
             self.output.data1.eq((self.cic.output.data1 >> 9) +
-                ((1 << 9 - 1) - 1)),
+                ((1 << 9 - 1) - 1)),  # round half down bias
         ]

@@ -50,6 +50,6 @@ class TestInter(unittest.TestCase):
                                   retrieve(self.dut.output, y)],
                        vcd_name="int.vcd")
         y = np.ravel(y)
-        print(y)
+        print(repr(y))
         #y0 =
         #np.testing.assert_equal(y, y0)

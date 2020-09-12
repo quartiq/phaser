@@ -9,8 +9,9 @@ from dac_data import DacData
 
 
 class PWM(Module):
-    def __init__(self, pin):
-        cnt = Signal(10, reset_less=True)
+    """Pulse width modulation"""
+    def __init__(self, pin, width=10):
+        cnt = Signal(width, reset_less=True)
         self.duty = Signal.like(cnt)
         self.sync += [
             cnt.eq(cnt + 1),
@@ -29,7 +30,11 @@ class Phaser(Module):
         self.submodules.link = Link(eem)
         # Set up the CRG to clock everything from the link clock
         # This avoids CDCs and latency variation. All latency variation is
-        # buffered by the DAC EB and compensated for by it's reset mechanism.
+        # buffered by the DAC EB and compensated for by its reset mechanism
+        # through ISTR (generated here from data clock) and OSTR (generated
+        # w.r.t DAC clk by PLL at PFD frequency). Deterministic initial
+        # conditions are set during initialization in terms
+        # of optimal DAC EB output reset address (fifo_offset).
         platform.add_period_constraint(eem.data0_p, 4.*8)
         self.submodules.crg = CRG(platform, link=self.link.phy.clk)
         # Don't bother meeting s/h for the clk iserdes. We align it.
@@ -116,7 +121,8 @@ class Phaser(Module):
         att_rstn = [platform.request("att_rstn") for _ in range(2)]
         adc_ctrl = platform.request("adc_ctrl")
         self.comb += [
-            self.decoder.get("board_id", "read").eq(19),  # Sinara.boards.index("Phaser")
+            # Sinara.boards.index("Phaser") == 19
+            self.decoder.get("board_id", "read").eq(19),
             self.decoder.get("hw_rev", "read").eq(Cat(
                 platform.request("hw_rev"), platform.request("hw_variant"))),
             self.decoder.get("gw_rev", "read").eq(0x01),
@@ -148,7 +154,8 @@ class Phaser(Module):
                 dac_ctrl.alarm, trf_ctrl[0].ld, trf_ctrl[1].ld,
                 adc_ctrl.term_stat, self.spi.idle)),
             self.spi.load.eq(self.decoder.registers["spi_datw"][0].bus.we),
-            self.spi.reg.pdo.eq(self.decoder.registers["spi_datw"][0].bus.dat_w),
+            self.spi.reg.pdo.eq(
+                self.decoder.registers["spi_datw"][0].bus.dat_w),
             # self.spi.readable, self.spi.writable, self.spi.idle,
             self.spiint.cs.eq(self.decoder.get("spi_sel", "write")),
             self.spiint.cs_polarity.eq(0),  # all active low
@@ -173,6 +180,8 @@ class Phaser(Module):
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
+            # this is correct since dac samples per frame is 8*20 and
+            # thus divisible by the EB depth of 8.
             self.dac.data_sync.eq(self.decoder.stb),
         ]
         for ch in range(2):
@@ -194,7 +203,6 @@ class Phaser(Module):
                 ),
             ]
             for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
-                # msb align 14 bit data to 16 bit duc
                 self.comb += [
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
@@ -241,7 +249,7 @@ class Phaser(Module):
                 # self.decoder.bus.bus.adr[0],
                 self.link.checker.miso,
                 # self.dac.data_sync,
-                # self.dac.istr,
+                self.dac.istr,
                 dac_ctrl.alarm,
             ))
         ]
@@ -250,5 +258,5 @@ class Phaser(Module):
 if __name__ == "__main__":
     from phaser_platform import Platform
     platform = Platform(load=True)
-    test = Phaser(platform)
-    platform.build(test, build_name="phaser")
+    top = Phaser(platform)
+    platform.build(top, build_name="phaser")
