@@ -115,7 +115,7 @@ class Phaser(EnvExperiment):
         f.dac_write(0x1e, 0x9999)  # qmc sync from sif and reg
         f.dac_write(0x1f, 0x9982)  # mix sync, nco sync, istr is istr, sif_sync
         f.dac_write(0x20, 0x2400)  # fifo sync ISTR-OSTR
-        f.dac_write(0x22, 0x1bb1)  # swap ab and cd dacs
+        f.dac_write(0x22, 0x1be4)  # reverse dacs for spectral inversion and layout
         f.dac_write(0x24, 0x0000)  # clk and data delays
 
         delay(1*ms)  # lock pll
