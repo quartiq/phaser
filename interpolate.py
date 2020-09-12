@@ -47,7 +47,7 @@ class SampleMux(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
-        # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 < 1, 9 taps
+        # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 ~ 0.9, 9 taps
         # maybe TODO: use symmetry for power
         self.submodules.ciccomp = MACFIR(9, scale=16)
         for i, ci in enumerate(
@@ -68,21 +68,22 @@ class InterpolateChannel(Module):
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
         # align MACs to MSB to save power
-        # 14 bit data
-        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data)
-        scale_out = len(self.hbf1.output.data) - len(self.cic.input.data)
+        # 14 bit data, one bit headroom
+        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
+        scale_out = len(self.hbf1.output.data) - len(self.cic.input.data) - 1
         self.comb += [
             self.input.connect(self.ciccomp.sample.load, omit=["data"]),
             self.ciccomp.sample.load.data.eq(self.input.data << scale_in),
             self.ciccomp.out.connect(self.hbf0.input),
             self.hbf0.output.connect(self.hbf1.input),
             self.hbf1.output.connect(self.cic.input, omit=["data"]),
-            # maybe TODO: rounding bias
-            self.cic.input.data.eq(self.hbf1.output.data >> scale_out),
+            self.cic.input.data.eq((self.hbf1.output.data >> scale_out) +
+                ((1 << scale_out - 1) - 1)),
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
             # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
             # the rest (2**9/5**4) is applied by ciccomp
-            # maybe TODO: rounding bias
-            self.output.data0.eq(self.cic.output.data0 >> 9),
-            self.output.data1.eq(self.cic.output.data1 >> 9),
+            self.output.data0.eq((self.cic.output.data0 >> 9) +
+                ((1 << 9 - 1) - 1)),
+            self.output.data1.eq((self.cic.output.data1 >> 9) +
+                ((1 << 9 - 1) - 1)),
         ]
