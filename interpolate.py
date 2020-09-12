@@ -23,6 +23,7 @@ class SampleMux(Module):
         samples = [Signal(n_channel*2*b_sample, reset_less=True)
                    for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
+        # maybe TODO: shift registers need fewer muxes
         i_sample = Signal(max=n_mux, reset_less=True)  # body pointer
         i_interp = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
@@ -64,26 +65,31 @@ class InterpolateChannel(Module):
             [294, 0, -1865, 0, 6869, 0, -20436, 0, 80679, 131072, 80679, 0,
                 -20436, 0, 6869, 0, -1865, 0, 294])
         # cic: rate 2/5 -> 2/1, gain=5**4
+        # the CIC doesn't cope with FIR overshoot and baseband data must be
+        # band limited and/or backed off. Maybe TODO: clipping
         self.submodules.cic = SuperCIC(n=5, r=5, width=16)
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
-        # align MACs to MSB to save power, keep one bit headroom
+        # align MACs to MSB to save power, keep one bit headroom for FIR
+        # overshoot.
         scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
         scale_out = len(self.hbf1.output.data) - len(self.cic.input.data) - 1
+        bias_out = (1 << scale_out - 1) - 1  # round half down bias
+        # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
+        # the rest (2**9/5**4) is applied by ciccomp
+        scale_cic = 9
+        bias_cic = (1 << scale_cic - 1) - 1  # round half down bias
         self.comb += [
             self.input.connect(self.ciccomp.sample.load, omit=["data"]),
             self.ciccomp.sample.load.data.eq(self.input.data << scale_in),
             self.ciccomp.out.connect(self.hbf0.input),
             self.hbf0.output.connect(self.hbf1.input),
             self.hbf1.output.connect(self.cic.input, omit=["data"]),
-            self.cic.input.data.eq((self.hbf1.output.data >> scale_out) +
-                ((1 << scale_out - 1) - 1)),  # round half down bias
+            self.cic.input.data.eq((self.hbf1.output.data + bias_out) >>
+                scale_out),
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
-            # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
-            # the rest (2**9/5**4) is applied by ciccomp
-            # maybe TODO: clipping
-            self.output.data0.eq((self.cic.output.data0 >> 9) +
-                ((1 << 9 - 1) - 1)),  # tound half down bias
-            self.output.data1.eq((self.cic.output.data1 >> 9) +
-                ((1 << 9 - 1) - 1)),  # round half down bias
+            self.output.data0.eq((self.cic.output.data0 + bias_cic) >>
+                scale_cic),
+            self.output.data1.eq((self.cic.output.data1 + bias_cic) >>
+                scale_cic),
         ]
