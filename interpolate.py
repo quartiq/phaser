@@ -82,6 +82,7 @@ class InterpolateChannel(Module):
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
             # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
             # the rest (2**9/5**4) is applied by ciccomp
+            # maybe TODO: clipping
             self.output.data0.eq((self.cic.output.data0 >> 9) +
                 ((1 << 9 - 1) - 1)),
             self.output.data1.eq((self.cic.output.data1 >> 9) +
