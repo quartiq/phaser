@@ -32,7 +32,7 @@ class Phaser(EnvExperiment):
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
             f.channel[ch].set_duc_frequency_mu(0)
-            # f.channel[ch].set_duc_frequency(200.598551*MHz)
+            f.channel[ch].set_duc_frequency(0.598551*MHz)
             f.channel[ch].set_duc_phase(.25)
             f.channel[ch].set_duc_cfg(select=0, clr=0)
             delay(.1*ms)

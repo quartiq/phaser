@@ -35,7 +35,7 @@ class DacData(Module):
         self.comb += [
             Cat(words).eq(Cat(self.data)),
             par.eq(Cat([parity(*word) for word in self.data])),
-            self.istr.eq(i[0]),
+            self.istr.eq(i[-1]),
         ]
         self.sync += [
             i.eq(Cat(i[-1], i)),
@@ -51,7 +51,7 @@ class DacData(Module):
 
         # SYNC for PLL N divider which generates internal fifo write pointer
         # reset OSTR, timed to dac_clk!, not needed if N=1
-        self._oserdes([0]*4, pins.sync_p, pins.sync_n)
+        self._oserdes([self.istr]*4, pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
         self._oserdes([self.istr, 0, 0, 0],
