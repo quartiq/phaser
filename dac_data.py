@@ -30,23 +30,25 @@ class DacData(Module):
         words = [[Signal.like(di) for di in d] for d in self.data]
         par = Signal(len(self.data), reset_less=True)
 
-        i = Signal(max=4, reset_less=True)
-        sync = Signal(8, reset_less=True)
-
         # make this sync to relax timing
         self.comb += [
             Cat(words).eq(Cat(self.data)),
             par.eq(Cat([parity(*word) for word in self.data])),
         ]
+
+        i = Signal(max=4, reset_less=True)
+        sync = Signal(8, reset_less=True)
+
         self.sync += [
             i.eq(i + 1),
-            If(i == 4 - 1,
-                self.istr.eq(1),
-            ),
             sync.eq(sync[4:]),
             If(self.data_sync,
                 i.eq(0),
-                sync.eq(0b1111 << self.sync_dly),
+                sync.eq(1 << self.sync_dly),
+            ),
+            self.istr.eq(0),
+            If(i == 4 - 1,
+                self.istr.eq(1),
             ),
         ]
 
