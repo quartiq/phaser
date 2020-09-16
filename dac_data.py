@@ -19,28 +19,34 @@ def parity(*x):
 class DacData(Module):
     def __init__(self, pins, swap=((0, 3), (1, 8))):
         self.data_sync = Signal()  # at most every 8 samples (4 sys cycles)
+        self.sync_dly = Signal(max=8, reset_less=True)
         # format as in the DS: A0:C0, B0:D0, A1:C1, B1:D1
         self.data = [[
             Signal(16, reset_less=True) for _ in range(2)
             ] for _ in range(4)]
+        self.istr = Signal(reset_less=True)
 
         # buffer for parity calculation
         words = [[Signal.like(di) for di in d] for d in self.data]
         par = Signal(len(self.data), reset_less=True)
 
-        i = Signal(4, reset_less=True)
-        self.istr = Signal(reset_less=True)
+        i = Signal(max=4, reset_less=True)
+        sync = Signal(8, reset_less=True)
 
         # make this sync to relax timing
         self.comb += [
             Cat(words).eq(Cat(self.data)),
             par.eq(Cat([parity(*word) for word in self.data])),
-            self.istr.eq(i[-1]),
         ]
         self.sync += [
-            i.eq(Cat(i[-1], i)),
+            i.eq(i + 1),
+            If(i == 4 - 1,
+                self.istr.eq(1),
+            ),
+            sync.eq(sync[4:]),
             If(self.data_sync,
-                i.eq(0b1000),
+                i.eq(0),
+                sync.eq(0b1111 << self.sync_dly),
             ),
         ]
 
@@ -51,7 +57,7 @@ class DacData(Module):
 
         # SYNC for PLL N divider which generates internal fifo write pointer
         # reset OSTR, timed to dac_clk!, not needed if N=1
-        self._oserdes([self.istr]*4, pins.sync_p, pins.sync_n)
+        self._oserdes(sync, pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
         self._oserdes([self.istr, 0, 0, 0],
@@ -61,7 +67,7 @@ class DacData(Module):
         self._oserdes(par, pins.paritycd_p, pins.paritycd_n)
 
         # external read pointer reset, timed to dac_clk*interpolation,
-        # not needed here
+        # not needed with SYNC+N-div+PLL generated internal OSTR
         # self._oserdes([0, 0, 0, 0], pins.ostr_p, pins.ostr_n)
 
         for i_port, port in enumerate([

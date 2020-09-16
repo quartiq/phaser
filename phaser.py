@@ -85,7 +85,9 @@ class Phaser(Module):
             ("spi_datw", Register(read=False)),
             # spi readback data, available after each transaction
             ("spi_datr", Register(write=False)),
-            ("reserved0", Register(read=False, write=False)),
+            # dac data interface sync delay (for sync-dac_clk alignment and
+            # n-div/pll/ostr fifo output synchronization)
+            ("sync_dly", Register(width=3)),
             (0x10,),
             # digital upconverter (duc) configuration
             # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
@@ -183,6 +185,7 @@ class Phaser(Module):
             # this is correct since dac samples per frame is 8*20 and
             # thus divisible by the EB depth of 8.
             self.dac.data_sync.eq(self.decoder.stb),
+            self.dac.sync_dly.eq(self.decoder.get("sync_dly", "write")),
         ]
         for ch in range(2):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
