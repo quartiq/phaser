@@ -23,6 +23,7 @@ class AsyncResetSynchronizerBUFG(Module):
 class CRG(Module):
     def __init__(self, platform, link=None):
         self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.cd_sys_rst = ClockDomain()
         self.clock_domains.cd_sys2 = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys2q = ClockDomain(reset_less=True)
         self.clock_domains.cd_clk200 = ClockDomain(reset_less=True)
@@ -53,6 +54,7 @@ class CRG(Module):
         sys2q = Signal()
         clk200 = Signal()
         delay_rdy = Signal()
+        rst_cnt = Signal(8, reset=0xff)
         self.specials += [
             Instance("MMCME2_BASE",
                 p_BANDWIDTH="LOW",
@@ -77,4 +79,13 @@ class CRG(Module):
                 i_REFCLK=self.cd_clk200.clk, i_RST=~locked, o_RDY=delay_rdy),
         ]
         self.submodules += AsyncResetSynchronizerBUFG(
-            self.cd_sys, ~(locked & delay_rdy))
+            self.cd_sys_rst, ~(locked & delay_rdy))
+        self.comb += self.cd_sys_rst.clk.eq(self.cd_sys.clk)
+        self.cd_sys.rst.reset = 1
+        self.sync.sys_rst += [
+            self.cd_sys.rst.eq(0),
+            If(rst_cnt != 0,
+                rst_cnt.eq(rst_cnt - 1),
+                self.cd_sys.rst.eq(1),
+            )
+        ]

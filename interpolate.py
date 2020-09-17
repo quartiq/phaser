@@ -24,7 +24,7 @@ class SampleMux(Module):
         samples = [Signal(n_channel*2*b_sample, reset_less=True)
                    for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
-        i_interp = Signal(max=n_interp, reset_less=True)  # interpolation
+        i_interp = Signal(max=n_interp, reset_less=True)  # stuffer
         self.comb += [
             # early sample is most significant
             Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
