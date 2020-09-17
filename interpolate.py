@@ -20,28 +20,28 @@ class SampleMux(Module):
         self.body_stb = Signal()
         self.sample = [Record(complex(b_sample)) for _ in range(n_channel)]
         self.sample_stb = Signal()
+        # frame body shift register
         samples = [Signal(n_channel*2*b_sample, reset_less=True)
                    for _ in range(n_mux)]
         assert len(Cat(samples)) == len(self.body)
-        # maybe TODO: shift registers need fewer muxes
-        i_sample = Signal(max=n_mux, reset_less=True)  # body pointer
         i_interp = Signal(max=n_interp, reset_less=True)  # interpolation
         self.comb += [
+            # early sample is most significant
             Cat([(_.i[-b_sample:], _.q[-b_sample:]) for _ in self.sample]).eq(
-                Array(samples)[i_sample]),
+                samples[-1])
         ]
         self.sync += [
             i_interp.eq(i_interp - 1),
             self.sample_stb.eq(0),
             If(i_interp == 0,
+                Cat(samples[1:]).eq(Cat(samples)),
                 i_interp.eq(n_interp - 1),
-                i_sample.eq(i_sample - 1),
                 self.sample_stb.eq(1),
             ),
             If(self.body_stb,
                 Cat(samples).eq(self.body),
-                i_sample.eq(n_mux - 1),  # early sample is most significant
                 i_interp.eq(n_interp - 1),
+                self.sample_stb.eq(1),
             )
         ]
 
