@@ -46,6 +46,27 @@ class SampleMux(Module):
         ]
 
 
+class MiniFIFO(Module):
+    """Minimal FIFO buffer, unit capacity"""
+    def __init__(self, width):
+        self.input = Endpoint([("data", width)])
+        self.output = Endpoint([("data", width)])
+        self.input.data.reset_less = True
+        self.output.data.reset_less = True
+        self.comb += [
+            self.input.ack.eq(~self.output.stb | self.output.ack),
+        ]
+        self.sync += [
+            If(self.output.stb & self.output.ack,
+                self.output.stb.eq(0),
+            ),
+            If(self.input.stb & self.input.ack,
+                self.output.data.eq(self.input.data),
+                self.output.stb.eq(1),
+            )
+        ]
+
+
 class InterpolateChannel(Module):
     def __init__(self):
         # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 ~ 0.9, 9 taps
@@ -68,6 +89,10 @@ class InterpolateChannel(Module):
         # the CIC doesn't cope with FIR overshoot and baseband data must be
         # band limited and/or backed off. Maybe TODO: clipping
         self.submodules.cic = SuperCIC(n=5, r=5, width=16)
+        # buffer the odd/even stutter of the HBFs
+        self.submodules.buf0 = MiniFIFO((len(self.hbf1.input.data), True))
+        self.submodules.buf1 = MiniFIFO((len(self.cic.input.data), True))
+
         self.input = Endpoint([("data", (14, True))])
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
         # align MACs to MSB to save power, keep one bit headroom for FIR
@@ -82,14 +107,16 @@ class InterpolateChannel(Module):
         self.comb += [
             self.input.connect(self.ciccomp.sample.load, omit=["data"]),
             self.ciccomp.sample.load.data.eq(self.input.data << scale_in),
-            self.ciccomp.out.connect(self.hbf0.input),
-            self.hbf0.output.connect(self.hbf1.input),
-            self.hbf1.output.connect(self.cic.input, omit=["data"]),
-            self.cic.input.data.eq((self.hbf1.output.data + bias_out) >>
-                scale_out),
+            self.ciccomp.output.connect(self.hbf0.input),
+            self.hbf0.output.connect(self.buf0.input),
+            self.buf0.output.connect(self.hbf1.input),
+            self.hbf1.output.connect(self.buf1.input, omit=["data"]),
+            self.buf1.input.data.eq((self.hbf1.output.data + bias_out) >>
+                                     scale_out),
+            self.buf1.output.connect(self.cic.input),
             self.cic.output.connect(self.output, omit=["data0", "data1"]),
             self.output.data0.eq((self.cic.output.data0 + bias_cic) >>
-                scale_cic),
+                                 scale_cic),
             self.output.data1.eq((self.cic.output.data1 + bias_cic) >>
-                scale_cic),
+                                 scale_cic),
         ]
