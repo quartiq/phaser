@@ -27,7 +27,7 @@ class Phaser(EnvExperiment):
         f = self.phaser0
 
         delay(1*ms)
-        f.init(clk_sel=1)
+        f.init()
 
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
