@@ -31,7 +31,7 @@ class Phaser(EnvExperiment):
 
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
-            f.channel[ch].set_duc_frequency_mu(0)
+            # f.channel[ch].set_duc_frequency_mu(0)
             f.channel[ch].set_duc_frequency(190.598551*MHz)
             f.channel[ch].set_duc_phase(.25)
             f.channel[ch].set_duc_cfg(select=0, clr=0)
@@ -49,8 +49,6 @@ class Phaser(EnvExperiment):
                 delay(.1*ms)
                 f.channel[ch].oscillator[osc].set_amplitude_phase(asf, phase=.25, clr=0)
                 delay(.1*ms)
-            # self.p(f.channel[ch].get_dac_data())
-            # self.core.break_realtime()
         f.duc_stb()
 
         for ch in range(2):
