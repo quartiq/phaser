@@ -52,19 +52,6 @@ class Phaser(EnvExperiment):
         f.duc_stb()
 
         for ch in range(2):
-            delay(.2*ms)
-            f.channel[ch].trf_write(0x601002a9)
-            f.channel[ch].trf_write(0x8880348a)
-            f.channel[ch].trf_write(0x0000000b)
-            f.channel[ch].trf_write(0x4a00800c)
-            f.channel[ch].trf_write(0x0d03a28d)
-            f.channel[ch].trf_write(0x9d90100e)
-            f.channel[ch].trf_write(0xd041100f)
-            delay(1*ms)  # lock
-            ld = f.get_sta() & (2 << ch)
-            assert ld != 0
-            delay(.1*ms)
-
             for addr in range(8):
                 r = f.channel[ch].trf_read(addr)
                 delay(.1*ms)
