@@ -220,18 +220,16 @@ class Phaser(Module):
             self.sync += [
                 If(cfg[2:4] == 1,  # ducx_cfg_sel
                     # i is lsb, q is msb
-                    # just repeat the test data
+                    # repeat the test data to fill the oserdes
                     Cat([d[ch] for d in self.dac.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
                 )
             ]
-        self.comb += [
-            # even samples
-            self.decoder.get("dac0_data", "read").eq(Cat(
-                d[0] for d in self.dac.data)),
-            self.decoder.get("dac1_data", "read").eq(Cat(
-                d[1] for d in self.dac.data)),
-        ]
+            self.comb += [
+                # even sample just before the oserdes
+                self.decoder.get("dac{}_data".format(ch), "read").eq(
+                    Cat(d[ch] for d in self.dac.data)),
+            ]
 
         # use liberally for debugging
         self.comb += [
