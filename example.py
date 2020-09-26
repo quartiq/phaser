@@ -26,8 +26,7 @@ class Phaser(EnvExperiment):
     def inner(self):
         f = self.phaser0
 
-        delay(1*ms)
-        f.init()
+        f.init(debug=True)
 
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
@@ -61,5 +60,5 @@ class Phaser(EnvExperiment):
         alarm = f.dac_read(0x05)
         self.p(alarm)
         self.core.break_realtime()
-        # f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
+        f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
         self.core.wait_until_mu(now_mu())

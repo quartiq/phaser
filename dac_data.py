@@ -37,14 +37,14 @@ class DacData(Module):
         ]
 
         i = Signal(max=4, reset_less=True)
-        sync = Signal(8, reset_less=True)
+        sync = Signal(12, reset_less=True)
 
         self.sync += [
             i.eq(i + 1),
-            sync.eq(sync[4:]),
+            sync.eq(sync[2:]),
             If(self.data_sync,
                 i.eq(0),
-                sync.eq(1 << self.sync_dly),
+                sync.eq(0xf << self.sync_dly),
             ),
             self.istr.eq(0),
             If(i == 4 - 1,
@@ -59,7 +59,7 @@ class DacData(Module):
 
         # SYNC for PLL N divider which generates internal fifo write pointer
         # reset OSTR, timed to dac_clk!, not needed if N=1
-        self._oserdes(sync, pins.sync_p, pins.sync_n)
+        self._oserdes([sync[0], sync[0], sync[1], sync[1]], pins.sync_p, pins.sync_n)
 
         # ISTR for write pointer
         self._oserdes([self.istr, 0, 0, 0],
