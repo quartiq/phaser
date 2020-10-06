@@ -257,7 +257,7 @@ class Phaser(Module):
 
 
 if __name__ == "__main__":
-    from phaser_platform import Platform
+    from migen.build.platforms.phaser import Platform
     platform = Platform(load=True)
     top = Phaser(platform)
     platform.build(top, build_name="phaser")

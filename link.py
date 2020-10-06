@@ -290,7 +290,7 @@ class Test(Module):
 
 
 if __name__ == "__main__":
-    from phaser_platform import Platform
+    from migen.build.platforms.phaser import Platform
     from crg import CRG
     platform = Platform(load=False)
     test = Test(platform)

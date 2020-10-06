@@ -1,7 +1,7 @@
 import unittest
 
 from phaser import Phaser
-from phaser_platform import Platform
+from migen.build.platforms.phaser import Platform
 
 
 class TestVerilog(unittest.TestCase):
