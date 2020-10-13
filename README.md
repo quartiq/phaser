@@ -22,6 +22,8 @@ The hardware design repository is over at [Sinara](https://github.com/sinara-hw/
 
 ### Loading bitstreams
 
+Precompiled bitstreams are available under [releases](https://github.com/quartiq/phaser/releases).
+
 With vivado and a vivado-compatible JTAG dongle, to load (volatile) a bitstream onto the FPGA, use:
 
 `vivado -mode batch -source load.tcl -tclargs build/phaser.bit`
