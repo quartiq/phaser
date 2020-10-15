@@ -60,5 +60,8 @@ class Phaser(EnvExperiment):
         alarm = f.dac_read(0x05)
         self.p(alarm)
         self.core.break_realtime()
-        f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
+        # This will set the TRFs and the DAC to sleep.
+        # Saves power and temperature rise but oviously disables RF as
+        # well.
+        # f.set_cfg(dac_sleep=1, trf0_ps=1, trf1_ps=1)
         self.core.wait_until_mu(now_mu())
