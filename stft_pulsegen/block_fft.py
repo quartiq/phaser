@@ -59,8 +59,8 @@ class Fft(Module):
         input_bitreversed : natural or bit-reversed input
     """
 
-    def __init__(self, n=32, ifft=False, width_i=16, width_o=16, width_int=16,
-                 width_wram=16, input_bitreversed=False):
+    def __init__(self, n=32, ifft=False, width_i=16, width_o=16, width_int=18,
+                 width_wram=18, input_bitreversed=False):
         # Parameters
         self.n = n
         self.width_int = width_int
@@ -99,7 +99,10 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        init = [0] * n
+        init[(n // 4)] = (2 ** (width_i - 2)) - 1000
+        init[(n // 16)] = (2 ** (width_i - 2)) - 1000
+        xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
         xram1_port1 = xram1.get_port(write_capable=True, mode=WRITE_FIRST)

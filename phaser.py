@@ -6,6 +6,7 @@ from crg import CRG
 from link import Link
 from decode import Decode, Register
 from dac_data import DacData
+from stft_pulsegen.pulsegen import Pulsegen
 
 
 class PWM(Module):
@@ -179,6 +180,8 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
+        self.submodules.pulsegen = pulsegen = Pulsegen()
+
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
@@ -214,7 +217,7 @@ class Phaser(Module):
                     If(cfg[2:4] == 0,  # ducx_cfg_sel
                         self.dac.data[2*t][ch].eq(to.i),
                         self.dac.data[2*t + 1][ch].eq(to.q),
-                    )
+                    ),
                 ]
 
             self.sync += [
@@ -223,8 +226,19 @@ class Phaser(Module):
                     # repeat the test data to fill the oserdes
                     Cat([d[ch] for d in self.dac.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
-                )
+                ),
             ]
+
+            self.sync += [
+                If(cfg[2:4] == 2,  # stft
+                   self.dac.data[0][ch].eq(pulsegen.inter_i.output.data0),
+                   self.dac.data[2][ch].eq(pulsegen.inter_i.output.data1),
+
+                   self.dac.data[1][ch].eq(pulsegen.inter_q.output.data0),
+                   self.dac.data[3][ch].eq(pulsegen.inter_q.output.data1),
+                   )
+            ]
+
             self.comb += [
                 # even sample just before the oserdes
                 self.decoder.get("dac{}_data".format(ch), "read").eq(
