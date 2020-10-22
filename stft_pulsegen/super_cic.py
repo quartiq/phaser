@@ -5,6 +5,7 @@ import numpy as np
 from migen import *
 from misoc.interconnect.stream import Endpoint
 
+
 class SuperCicUS(Module):
     """Supersampled CIC filter upsampler. Interpolates the input by variable rate r.
     Processes two new output samples every clockcycle if input data isn't stalled.
@@ -70,10 +71,10 @@ class SuperCicUS(Module):
         self.sync += [
             r_reg.eq(self.r),
             If(~inp_stall,
-               i.eq(i+1),
+               i.eq(i + 1),
                ),
             If((i == r_reg - 1) | f_rst,
-                i.eq(0),
+               i.eq(0),
                ),
         ]
 
@@ -117,7 +118,7 @@ class SuperCicUS(Module):
                   sig_a.eq(sig_i),
                   ),
                sig_b.eq(sig_i)
-            ),
+               ),
             If(f_rst,
                sig_a.eq(0),
                sig_b.eq(0),
@@ -133,11 +134,11 @@ class SuperCicUS(Module):
             sum_b = Signal((width, True))
             self.sync += [
                 If(~inp_stall,
-                    sig_a0.eq(sig_a),
-                    sum_ab.eq(sig_a + sig_b),
-                    sum_a.eq(sum_b + sig_a0),
-                    sum_b.eq(sum_b + sum_ab),
-                ),
+                   sig_a0.eq(sig_a),
+                   sum_ab.eq(sig_a + sig_b),
+                   sum_a.eq(sum_b + sig_a0),
+                   sum_b.eq(sum_b + sum_ab),
+                   ),
                 If(f_rst,
                    sig_a0.eq(0),
                    sum_ab.eq(0),
@@ -162,13 +163,13 @@ class SuperCicUS(Module):
         """tweaks the DC gain of the cic to be unity for all ratechanges"""
         tweaks = np.arange(r_max)
         tweaks[0] = 1
-        shifts = np.ceil(np.log2(tweaks ** (n -1))).astype('int').tolist()
+        shifts = np.ceil(np.log2(tweaks ** (n - 1))).astype('int').tolist()
         bitshift_lut_width = int(np.ceil(np.log2(max(shifts))))
         # Nr. bits for the bitshifting LUT. The rest will be gaintweak LUT.
         print(f'bitshift bits in LUT: {bitshift_lut_width}')
         tweaks = (np.ceil(np.log2(tweaks ** (n - 1))) - np.log2(tweaks ** (n - 1)))
-        tweaks = (2**tweaks)
-        tweaks = tweaks * 2**(width_lut - bitshift_lut_width - 1)
+        tweaks = (2 ** tweaks)
+        tweaks = tweaks * 2 ** (width_lut - bitshift_lut_width - 1)
         tweaks = tweaks.astype('int').tolist()
         for i, e in enumerate(tweaks):
             tweaks[i] = tweaks[i] | (shifts[i] << (width_lut - bitshift_lut_width))
@@ -182,7 +183,7 @@ class SuperCicUS(Module):
             port.adr.eq(r),
             temp.eq(port.dat_r[:(width_lut - bitshift_lut_width)] * x),
             out.eq(temp >> (width_lut - bitshift_lut_width - 1)),
-            #out.eq((port.dat_r[:(width_lut - bitshift_lut_width)] * x) >> (width_lut - bitshift_lut_width - 1)),
+            # out.eq((port.dat_r[:(width_lut - bitshift_lut_width)] * x) >> (width_lut - bitshift_lut_width - 1)),
             shift.eq(port.dat_r[(width_lut - bitshift_lut_width):])
-            ]
+        ]
         return out, shift

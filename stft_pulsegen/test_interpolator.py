@@ -5,10 +5,9 @@ from migen import *
 from super_interpolator import SuperInterpolator
 
 
-
-
 class TestInterpolator(unittest.TestCase):
 
+    @staticmethod
     def hbf_response(self, r):
         assert r in (4, 2), "unsupported rate"
         #  HBF0 impulse response:
@@ -43,7 +42,7 @@ class TestInterpolator(unittest.TestCase):
         self.tweaks = tweaks.astype('int').tolist()
 
     def cic_model(self, x, r):
-        '''computes the cic response as implemented in SuperCicUs'''
+        """computes the cic response as implemented in SuperCicUs"""
         h_cic = 1
         for i in range(self.n):
             h_cic = np.convolve(np.ones(r), h_cic)
@@ -56,6 +55,7 @@ class TestInterpolator(unittest.TestCase):
             y_full[i] = e >> self.shifts[r]
         return y_full.astype('int').tolist()
 
+    @staticmethod
     def calc_delay(self, r):
         assert (r % 4 == 0) | (r == 2), "unsupported rate"
         if r == 2:
@@ -144,7 +144,7 @@ class TestInterpolator(unittest.TestCase):
         self.inter = SuperInterpolator(width_d=16, r_max=r_max//4)
 
     def test_hbf0(self):
-        '''test for r=2, only hbf0 engaged'''
+        """test for r=2, only hbf0 engaged"""
         r = 2
 
         y_model = self.interpolator_model(self.x, r)
@@ -154,7 +154,7 @@ class TestInterpolator(unittest.TestCase):
         self.assertEqual(y_model, y_sim)
 
     def test_hbf01(self):
-        '''test for r=4, hbf0 and hbf1 used'''
+        """test for r=4, hbf0 and hbf1 used"""
         r = 4
 
         y_model = self.interpolator_model(self.x, r)
@@ -164,7 +164,7 @@ class TestInterpolator(unittest.TestCase):
         self.assertEqual(y_model, y_sim)
 
     def test_full(self):
-        '''test for r>4, hbf0 + hbf1 + cic'''
+        """test for r>4, hbf0 + hbf1 + cic"""
 
         r = 36
         y_model = self.interpolator_model(self.x, r)

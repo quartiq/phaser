@@ -51,16 +51,16 @@ class SuperInterpolator(Module):
     def __init__(self, width_d=16, r_max=4096, dsp_arch="xilinx"):
         l2r = int(np.ceil(np.log2(r_max)))
         assert dsp_arch in ("xilinx", "lattice"), "unsupported dsp architecture"
-        assert r_max % 4 == 0,  "unsupported ratechange"
+        assert r_max % 4 == 0, "unsupported ratechange"
 
         ###
-        self.input = Endpoint([("data", (width_d, True))])      # Data in
-        self.output = Endpoint([("data0", (width_d, True)),     # Data out 0
-                                ("data1", (width_d, True))])    # Data out 1
-        self.r = Signal(l2r)                                    # Interpolation rate
+        self.input = Endpoint([("data", (width_d, True))])  # Data in
+        self.output = Endpoint([("data0", (width_d, True)),  # Data out 0
+                                ("data1", (width_d, True))])  # Data out 1
+        self.r = Signal(l2r)  # Interpolation rate
         ###
 
-        self.dsp_arch=dsp_arch
+        self.dsp_arch = dsp_arch
 
         self.hbfstop = Signal()  # hbf stop signal
         self.inp_stall = Signal()  # global input stall (stop) signal
@@ -109,7 +109,7 @@ class SuperInterpolator(Module):
             y_reg = [Signal((48, True)) for _ in range(((nr_dsps - 1) // 2) + 1)]
 
         # last stage: supersampled CIC interpolator
-        self.submodules.cic = SuperCicUS(width_d=width_d, n=6, r_max=r_max//4, gaincompensated=True, width_lut=18)
+        self.submodules.cic = SuperCicUS(width_d=width_d, n=6, r_max=r_max // 4, gaincompensated=True, width_lut=18)
 
         # input/output handling
         self.comb += [
@@ -119,10 +119,10 @@ class SuperInterpolator(Module):
                self.output.data0.eq(y[-1][width_coef - 1:width_coef - 1 + width_d]),
                self.output.data1.eq(Mux(self.mode2, x1_[-1], x[-1])),
                ).Else(  # If CIC engaged
-                   self.input.ack.eq(hbf0_step1 & ~self.hbfstop),
-                   self.output.data0.eq(self.cic.output.data0),
-                   self.output.data1.eq(self.cic.output.data1),
-               )
+                self.input.ack.eq(hbf0_step1 & ~self.hbfstop),
+                self.output.data0.eq(self.cic.output.data0),
+                self.output.data1.eq(self.cic.output.data1),
+            )
         ]
 
         # Interpolator mode and dataflow handling
@@ -184,7 +184,6 @@ class SuperInterpolator(Module):
                 if i >= 1:
                     self.comb += [
                         c.eq(Mux(self.mode2, y_reg[i - 1], y[i - 1])),
-                        #c.eq(y[i-1])
                     ]
                 else:
                     self.comb += c.eq(bias)

@@ -6,16 +6,16 @@ import matplotlib.pyplot as plt
 
 class FftModel:
     """fixed point radix2 dit fft with fixed point scaling numerical model
-    
+
     Takes a complex fixed point vector with fixed point position to take the fft of.
     The data is stored in an internal vector and successive fft stages can be performed.
-    
+
     Fixed point is modeled via integers and bitshifting.
     Unfortunately this means some more interpretation of intermediate results...
     Overflows are captured by the model, if the total nr of bits for real/complex data is provided.
     Sign bit is not included.
 
-    
+
     Parameters
         ----------
     x_in : complex array
@@ -71,7 +71,7 @@ class FftModel:
         for i in range(self._bfls):
             w_idx = (t_s * i) % self._bfls  # twiddle factor index for each stage. wraps around.
             q = (1 << self.stage) - 1  # lower bits bitmask ie 000000000011 for s=3. responsible for consecuteve parts
-            x_idx = (((i & ~q) << 1) | (i & q)) + ( 1 << self.stage)  # compute memory adress.
+            x_idx = (((i & ~q) << 1) | (i & q)) + (1 << self.stage)  # compute memory adress.
             ar, ai = self.xr[x_idx - (1 << self.stage)], self.xi[x_idx - (1 << self.stage)]  # mem access
             br, bi = self.xr[x_idx], self.xi[x_idx]
             wr, wi = self.wr[w_idx], self.wi[w_idx]

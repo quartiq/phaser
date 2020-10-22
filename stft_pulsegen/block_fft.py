@@ -72,7 +72,8 @@ class Fft(Module):
         assert m % 1 == 0, "input vector length needs to be power of two long"
         self.log2n = int(m)
 
-        ### IO signals
+        # IO signals
+        ###
         self.x_in = Signal((self.width_i * 2, True))  # write data
         self.x_in_we = Signal()  # write enable
         self.x_in_adr = Signal(self.log2n)  # write address
@@ -109,7 +110,7 @@ class Fft(Module):
         xram2b_port2 = xram2b.get_port(write_capable=True)
         dat_r = Signal(width_int * 2)
         self.specials += xram1, xram1_port1, xram1_port2, xram2a, \
-                         xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2
+            xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2
 
         # Memory Wiring
         a_mux_l, c_mux, a_x2_mux_l, c_x2_mux, x1p1_adr, x1p2_adr, x2p1_adr, x2p2_adr, bfl_we, stage_w_n \
@@ -302,7 +303,7 @@ class Fft(Module):
         """generates twiddle rom and logic for assembling the twiddles from one quarter circle"""
         pos = np.linspace(0, np.pi / 2, int(self.n / 4), False)
         self.w_p = self.width_wram - 2  # Fixed point position of twiddles. One bit is sign and one is nonfractional (ie 1 at the 0th twiddle)
-        twiddles = [(int(_.real) | int(_.imag) << self.width_wram) & (1 << self.width_wram*2)-1
+        twiddles = [(int(_.real) | int(_.imag) << self.width_wram) & (1 << self.width_wram * 2) - 1
                     for _ in np.round((1 << (self.width_wram - 2)) * np.exp(-1j * pos))]
         wram = Memory(self.width_wram * 2, int(self.n / 4), init=twiddles, name="twiddle")
         wram_port = wram.get_port()
