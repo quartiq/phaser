@@ -6,6 +6,7 @@ on:
       - staging
       - trying
       - master
+      - stft_pulsegen
 
 jobs:
   test:
