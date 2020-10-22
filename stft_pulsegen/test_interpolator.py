@@ -8,8 +8,8 @@ from super_interpolator import SuperInterpolator
 class TestInterpolator(unittest.TestCase):
 
     @staticmethod
-    def hbf_response(self, r):
-        assert r in (4, 2), "unsupported rate"
+    def hbf_response(r):
+        assert r in (4, 2), "unupported rate"
         #  HBF0 impulse response:
         h_0 = [9, 0, -32, 0, 83, 0, -183, 0,
                360, 0, -650, 0, 1103, 0, -1780, 0,
@@ -56,7 +56,7 @@ class TestInterpolator(unittest.TestCase):
         return y_full.astype('int').tolist()
 
     @staticmethod
-    def calc_delay(self, r):
+    def calc_delay(r):
         assert (r % 4 == 0) | (r == 2), "unsupported rate"
         if r == 2:
             return 18 + 20
