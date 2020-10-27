@@ -70,7 +70,7 @@ class SuperCicUS(Module):
 
         self.sync += [
             r_reg.eq(self.r),
-            If(~inp_stall,
+            If(~inp_stall_reg,
                i.eq(i + 1),
                ),
             If((i == r_reg - 1) | f_rst,
@@ -133,7 +133,7 @@ class SuperCicUS(Module):
             sum_a = Signal((width, True))
             sum_b = Signal((width, True))
             self.sync += [
-                If(~inp_stall,
+                If(~inp_stall_reg,
                    sig_a0.eq(sig_a),
                    sum_ab.eq(sig_a + sig_b),
                    sum_a.eq(sum_b + sig_a0),
