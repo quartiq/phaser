@@ -33,7 +33,8 @@ class Phaser(EnvExperiment):
             # f.channel[ch].set_duc_frequency_mu(0)
             f.channel[ch].set_duc_frequency(190.598551*MHz)
             f.channel[ch].set_duc_phase(.25)
-            f.channel[ch].set_duc_cfg(select=0, clr=0)
+            f.channel[ch].set_duc_cfg(select=2, clr=0)
+            f.write8(0x30, 1)
             delay(.1*ms)
             for osc in range(5):
                 ftw = (osc + 1)*1.875391*MHz

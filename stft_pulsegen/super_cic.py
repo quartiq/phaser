@@ -179,9 +179,13 @@ class SuperCicUS(Module):
         out = Signal((len(x) + n, True))
         shift = Signal((bitshift_lut_width, True))
         temp = Signal((width_lut - bitshift_lut_width + self.width_d, True))
-        self.comb += [
+        tweak = Signal(width_lut - bitshift_lut_width)
+        x_reg = Signal.like(x)
+        self.sync += [
+            x_reg.eq(x),
             port.adr.eq(r),
-            temp.eq(port.dat_r[:(width_lut - bitshift_lut_width)] * x),
+            tweak.eq(port.dat_r[:(width_lut - bitshift_lut_width)]),
+            temp.eq(tweak * x_reg),
             out.eq(temp >> (width_lut - bitshift_lut_width - 1)),
             # out.eq((port.dat_r[:(width_lut - bitshift_lut_width)] * x) >> (width_lut - bitshift_lut_width - 1)),
             shift.eq(port.dat_r[(width_lut - bitshift_lut_width):])

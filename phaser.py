@@ -117,6 +117,7 @@ class Phaser(Module):
                           Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
+            ("fft_start", Register()),
         ])
 
         dac_ctrl = platform.request("dac_ctrl")
@@ -181,6 +182,9 @@ class Phaser(Module):
         ]
 
         self.submodules.pulsegen = pulsegen = Pulsegen()
+        self.comb += [
+            pulsegen.fft.start.eq(self.decoder.get("fft_start", "read"))
+        ]
 
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
@@ -229,10 +233,11 @@ class Phaser(Module):
                 ),
             ]
 
+
             self.sync += [
                 If(cfg[2:4] == 2,  # stft
-                   self.dac.data[0][ch].eq(pulsegen.inter_i.output.data0),
-                   self.dac.data[2][ch].eq(pulsegen.inter_i.output.data1),
+                   self.dac.data[0][ch].eq(pulsegen.inter_q.output.data0),
+                   self.dac.data[2][ch].eq(pulsegen.inter_q.output.data1),
 
                    self.dac.data[1][ch].eq(pulsegen.inter_q.output.data0),
                    self.dac.data[3][ch].eq(pulsegen.inter_q.output.data1),
