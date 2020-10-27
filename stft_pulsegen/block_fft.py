@@ -99,10 +99,11 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        init = [0] * n
-        init[(n // 4)] = (2 ** (width_i - 2)) - 1000
-        init[(n // 16)] = (2 ** (width_i - 2)) - 1000
-        xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
+        #init = [0] * (n//2)
+        #init[(n // 4)] = (2 ** (width_i - 2)) - 1000
+        #init[(n // 16)] = (2 ** (width_i - 2)) - 1000
+        xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        #xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
         xram1_port1 = xram1.get_port(write_capable=True, mode=WRITE_FIRST)
@@ -269,8 +270,8 @@ class Fft(Module):
         ai_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(6)]
         br_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(4)]
         bi_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(4)]
-        wr_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(3)]
-        wi_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(3)]
+        wr_reg = [Signal((self.width_wram, True), reset_less=True) for _ in range(3)]
+        wi_reg = [Signal((self.width_wram, True), reset_less=True) for _ in range(3)]
         bd = Signal((self.width_int + 1, True), reset_less=True)
         ws = Signal((self.width_int + 1, True), reset_less=True)
         wd = Signal((self.width_int + 1, True), reset_less=True)
@@ -285,10 +286,10 @@ class Fft(Module):
             Cat(wr_reg).eq(Cat(wr, wr_reg)),  # 1
             Cat(wi_reg).eq(Cat(wi, wi_reg)),  # 1
             bd.eq(br_reg[0] + bi_reg[0]),  # 2
-            m[0].eq(bd * wr_reg[1]),  # 3
+            m[0].eq(bd * wr_reg[0]),  # 3
             m[1].eq(m[0] + bias),  # 4
-            ws.eq(wr_reg[2] + wi_reg[2]),  # 4
-            wd.eq(wr_reg[2] - wi_reg[2]),  # 4
+            ws.eq(wr_reg[1] + wi_reg[1]),  # 4
+            wd.eq(wr_reg[1] - wi_reg[1]),  # 4
             m[2].eq(ws * bi_reg[3]),  # 5
             m[3].eq(wd * br_reg[3]),  # 5
             m[4].eq(m[1]),  # 5
@@ -315,23 +316,24 @@ class Fft(Module):
         wi = Signal((self.width_wram, True))
         wr_ram = Signal((self.width_wram, True))
         wi_ram = Signal((self.width_wram, True))
-        w_idx_l = Signal()  # last upper index bits
-        self.comb += [
-            wram_port.adr.eq(w_idx[:-1]),
+        w_idx_l = Signal(2)  # last upper index bits
+
+        self.comb += wram_port.adr.eq(w_idx[:-1])
+        self.sync += [
             wr_ram.eq(wram_port.dat_r[:self.width_wram]),  # get twiddle real
             wi_ram.eq(wram_port.dat_r[self.width_wram:]),  # get twiddle imag
         ]
         if self.ifft:
             self.comb += [
-                wr.eq(Mux(w_idx_l, wi_ram, wr_ram)),
-                wi.eq(Mux(w_idx_l, wr_ram, -wi_ram))
+                wr.eq(Mux(w_idx_l[-1], wi_ram, wr_ram)),
+                wi.eq(Mux(w_idx_l[-1], wr_ram, -wi_ram))
             ]
         else:
             self.comb += [
-                wr.eq(Mux(w_idx_l, wi_ram, wr_ram)),
-                wi.eq(Mux(w_idx_l, -wr_ram, wi_ram))
+                wr.eq(Mux(w_idx_l[-1], wi_ram, wr_ram)),
+                wi.eq(Mux(w_idx_l[-1], -wr_ram, wi_ram))
             ]
-        self.sync += w_idx_l.eq(w_idx[-1])
+        self.sync += Cat(w_idx_l).eq(Cat(w_idx[-1],w_idx_l))
         return wr, wi
 
     def _twiddle_addr_calc(self):
