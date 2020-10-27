@@ -79,7 +79,7 @@ class TestFft(unittest.TestCase):
 
     def test_bitreversed(self):
         """ bitreversed input test for 128 point fft with randomized phases."""
-        self.fft = Fft(n=128, ifft=True, input_bitreversed=True)
+        self.fft = Fft(n=128, ifft=True, input_bitreversed=True, width_int=16, width_wram=16)
         fft_model = FftModel(self.x, w_p=14)
         x_o_model = fft_model.full_fft(scaling='one', ifft=True)
         y = bit_rev(self.x)
@@ -89,7 +89,7 @@ class TestFft(unittest.TestCase):
 
     def test_natural(self):
         """ natural order input test for 128 point fft"""
-        self.fft = Fft(n=128, ifft=True)
+        self.fft = Fft(n=128, ifft=True, width_int=16, width_wram=16)
         fft_model = FftModel(self.x, w_p=14)
         x_o_model = fft_model.full_fft(scaling='one', ifft=True)
         y = prep_mem(self.x, self.fft.width_int)
@@ -98,7 +98,7 @@ class TestFft(unittest.TestCase):
 
     def test_scaling(self):
         """ 2**5 scaling test of fft calculation"""
-        self.fft = Fft(n=128, ifft=True)
+        self.fft = Fft(n=128, ifft=True, width_int=16, width_wram=16)
         fft_model = FftModel(self.x, w_p=14)
         x_o_model = fft_model.full_fft(scaling=int('0011101', 2), ifft=True)
         y = prep_mem(self.x, self.fft.width_int)
