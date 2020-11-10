@@ -100,19 +100,19 @@ class Fft(Module):
 
         # Data Memories
         init = [0] * (n//2)
-        #init[(n // 4)] = (2 ** (width_i - 2)) - 1000
-        init[(n // 8)] = (2 ** (width_i - 1)) - 1000
+        init[(n // 4)] = (2 ** (width_i - 2)) - 1000
+        init[(n // 8)] = (2 ** (width_i - 2)) - 1000
         #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
         #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
         xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
-        xram1_port1 = xram1.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
-        xram1_port2 = xram1.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
-        xram2a_port1 = xram2a.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
-        xram2a_port2 = xram2a.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
-        xram2b_port1 = xram2b.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
-        xram2b_port2 = xram2b.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram1_port1 = xram1.get_port(write_capable=True, mode=READ_FIRST)
+        xram1_port2 = xram1.get_port(write_capable=True, mode=READ_FIRST)
+        xram2a_port1 = xram2a.get_port(write_capable=True, mode=READ_FIRST)
+        xram2a_port2 = xram2a.get_port(write_capable=True, mode=READ_FIRST)
+        xram2b_port1 = xram2b.get_port(write_capable=True, mode=READ_FIRST)
+        xram2b_port2 = xram2b.get_port(write_capable=True, mode=READ_FIRST)
         dat_r = Signal(width_int * 2)
         self.specials += xram1, xram1_port1, xram1_port2, xram2a, \
             xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2

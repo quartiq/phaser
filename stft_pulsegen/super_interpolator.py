@@ -69,6 +69,7 @@ class SuperInterpolator(Module):
         hbf0_step1 = Signal()  # hbf0 step1 signal if in mode 2
         hbf1_step1 = Signal()
         muxsel0 = Signal()  # necessary bc big expressions in Mux condition dont work
+        r_reg = Signal(l2r)  # Interpolation rate register
 
         nr_dsps = 15
         width_coef = 18
@@ -127,16 +128,17 @@ class SuperInterpolator(Module):
 
         # Interpolator mode and dataflow handling
         self.comb += [
-            self.mode2.eq(Mux(self.r >= 4, 1, 0)),
-            self.mode3.eq(Mux(self.r >= 8, 1, 0)),
+            self.mode2.eq(Mux(r_reg >= 4, 1, 0)),
+            self.mode3.eq(Mux(r_reg >= 8, 1, 0)),
             muxsel0.eq((~self.cic.input.ack) | (self.mode3 & hbf1_step1)),
             self.hbfstop.eq(Mux(muxsel0, 1, 0)),
-            self.cic.r.eq(self.r[2:]),  # r_cic = r_inter//4
+            self.cic.r.eq(r_reg[2:]),  # r_cic = r_inter//4
             self.cic.input.data.eq(Mux(hbf1_step1, y[-1][width_coef - 1:width_coef - 1 + width_d], x1_[-1])),
             self.cic.input.stb.eq(self.mode3),
             x1__.eq(y[midpoint][width_coef - 1:width_coef - 1 + width_d]),
         ]
         self.sync += [
+            r_reg.eq(self.r),
             If(~self.hbfstop,
                If(~self.mode2 | (self.mode2 & hbf0_step1),
                   Cat(x).eq(Cat(self.input.data, x)),
@@ -276,12 +278,15 @@ class SuperInterpolator(Module):
             m = Signal((48, True))
             p = Signal((48, True))
 
+        mux_p_reg = Signal(2)  # double registered p mux signal
+
         self.sync += [
             If(~self.hbfstop,
+               Cat(mux_p_reg).eq(Cat(mux_p, mux_p_reg)),
                b_reg.eq(b),
                ad.eq(a + d),
                m.eq(ad * b_reg),
-               If(~mux_p, p.eq(p + m)
+               If(~mux_p_reg[-1], p.eq(p + m)
                   ).Else(p.eq(m + c))
                )
         ]
