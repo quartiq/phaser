@@ -99,19 +99,20 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        #init = [0] * (n//2)
+        init = [0] * (n//2)
         #init[(n // 4)] = (2 ** (width_i - 2)) - 1000
-        #init[(n // 16)] = (2 ** (width_i - 2)) - 1000
-        xram1 = Memory(width_int * 2, int(n / 2), name="data1")
-        #xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
+        init[(n // 8)] = (2 ** (width_i - 1)) - 1000
+        #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
-        xram1_port1 = xram1.get_port(write_capable=True, mode=WRITE_FIRST)
-        xram1_port2 = xram1.get_port(write_capable=True)
-        xram2a_port1 = xram2a.get_port(write_capable=True, mode=WRITE_FIRST)
-        xram2a_port2 = xram2a.get_port(write_capable=True)
-        xram2b_port1 = xram2b.get_port(write_capable=True, mode=WRITE_FIRST)
-        xram2b_port2 = xram2b.get_port(write_capable=True)
+        xram1_port1 = xram1.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram1_port2 = xram1.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram2a_port1 = xram2a.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram2a_port2 = xram2a.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram2b_port1 = xram2b.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
+        xram2b_port2 = xram2b.get_port(write_capable=True, mode=READ_FIRST, we_granularity=self.width_int * 2)
         dat_r = Signal(width_int * 2)
         self.specials += xram1, xram1_port1, xram1_port2, xram2a, \
             xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2
@@ -262,20 +263,20 @@ class Fft(Module):
         """
         self.PIPE_DELAY = 8
         bias = (1 << self.w_p - 1) - 1
-        cr = Signal((self.width_int, True), reset_less=True)
-        ci = Signal((self.width_int, True), reset_less=True)
-        dr = Signal((self.width_int, True), reset_less=True)
-        di = Signal((self.width_int, True), reset_less=True)
-        ar_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(6)]
-        ai_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(6)]
-        br_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(4)]
-        bi_reg = [Signal((self.width_int, True), reset_less=True) for _ in range(4)]
-        wr_reg = [Signal((self.width_wram, True), reset_less=True) for _ in range(3)]
-        wi_reg = [Signal((self.width_wram, True), reset_less=True) for _ in range(3)]
-        bd = Signal((self.width_int + 1, True), reset_less=True)
-        ws = Signal((self.width_int + 1, True), reset_less=True)
-        wd = Signal((self.width_int + 1, True), reset_less=True)
-        m = [Signal((self.width_int * 2 + 1, True), reset_less=True)
+        cr = Signal((self.width_int, True))
+        ci = Signal((self.width_int, True))
+        dr = Signal((self.width_int, True))
+        di = Signal((self.width_int, True))
+        ar_reg = [Signal((self.width_int, True)) for _ in range(6)]
+        ai_reg = [Signal((self.width_int, True)) for _ in range(6)]
+        br_reg = [Signal((self.width_int, True)) for _ in range(4)]
+        bi_reg = [Signal((self.width_int, True)) for _ in range(4)]
+        wr_reg = [Signal((self.width_wram, True)) for _ in range(2)]
+        wi_reg = [Signal((self.width_wram, True)) for _ in range(2)]
+        bd = Signal((self.width_int + 1, True))
+        ws = Signal((self.width_int + 1, True))
+        wd = Signal((self.width_int + 1, True))
+        m = [Signal((self.width_int * 2 + 1, True))
              for _ in range(8)]
         self.sync += [
             # 0th stage: ram access
@@ -333,7 +334,7 @@ class Fft(Module):
                 wr.eq(Mux(w_idx_l[-1], wi_ram, wr_ram)),
                 wi.eq(Mux(w_idx_l[-1], -wr_ram, wi_ram))
             ]
-        self.sync += Cat(w_idx_l).eq(Cat(w_idx[-1],w_idx_l))
+        self.sync += Cat(w_idx_l).eq(Cat(w_idx[-1], w_idx_l))
         return wr, wi
 
     def _twiddle_addr_calc(self):

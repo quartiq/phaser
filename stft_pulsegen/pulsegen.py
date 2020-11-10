@@ -23,7 +23,7 @@ class Pulsegen(Module):
         #self.submodules.inter_i = inter_i = SuperInterpolator()
         self.submodules.inter_q = inter_q = SuperInterpolator()
 
-        cnt = Signal(3)
+        cnt = Signal(10)
         pos = Signal(int(np.log2(size_fft)))
 
         self.comb += [
@@ -33,18 +33,18 @@ class Pulsegen(Module):
             fft.scaling.eq(0xff),
             fft.x_out_adr.eq(pos),
             #inter_i.r.eq(2),
-            inter_q.r.eq(2),
+            #inter_q.r.eq(2),
         ]
 
         self.sync += [
             cnt.eq(cnt+1),
-            #If(cnt[-1], fft.start.eq(1)),
+            #If(cnt[2], fft.start.eq(1)),
             If(inter_q.input.ack,
-               pos.eq(pos + 1))
+            pos.eq(pos + 1))
         ]
 
     def sim(self):
-        for i in range(2000):
+        for i in range(1500):
             yield
             #x = yield self.out0
             #if x > 700: print(x)
