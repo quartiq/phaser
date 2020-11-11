@@ -92,22 +92,22 @@ class SuperInterpolator(Module):
                -418, 0, 69]
         coef_a = []
         for i, coef in enumerate(h_0[: (len(h_0) + 1) // 2: 2]):
-            coef_a.append(Signal((width_coef, True), reset=coef))
+            coef_a.append(Signal((width_coef, True), reset_less=True, reset=coef))
         coef_b = []
         for i, coef in enumerate(h_1[: (len(h_1) + 1) // 2: 2]):
-            coef_b.append(Signal((width_coef, True), reset=coef))
+            coef_b.append(Signal((width_coef, True), reset_less=True, reset=coef))
 
-        x = [Signal((width_d, True)) for _ in range(((len(coef_a) * 2) + 2))]  # input hbf0
-        x_end_l = Signal((width_d, True))
-        x1_ = [Signal((width_d, True)) for _ in range(((len(coef_b) * 2) + 2))]  # input hbf1
-        x1__ = Signal((width_d, True))  # intermediate signal
+        x = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_a) * 2) + 2))]  # input hbf0
+        x_end_l = Signal((width_d, True), reset_less=True)
+        x1_ = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_b) * 2) + 2))]  # input hbf1
+        x1__ = Signal((width_d, True), reset_less=True)  # intermediate signal
 
         if dsp_arch == "lattice":
-            y = [Signal((36, True)) for _ in range(nr_dsps)]
-            y_reg = [Signal((36, True)) for _ in range(((nr_dsps - 1) // 2) + 1)]
+            y = [Signal((36, True), reset_less=True) for _ in range(nr_dsps)]
+            y_reg = [Signal((36, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
         else:  # xilinx dsp arch
-            y = [Signal((48, True)) for _ in range(nr_dsps)]
-            y_reg = [Signal((48, True)) for _ in range(((nr_dsps - 1) // 2) + 1)]
+            y = [Signal((48, True), reset_less=True) for _ in range(nr_dsps)]
+            y_reg = [Signal((48, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
 
         # last stage: supersampled CIC interpolator
         self.submodules.cic = SuperCicUS(width_d=width_d, n=6, r_max=r_max // 4, gaincompensated=True, width_lut=18)
@@ -258,25 +258,25 @@ class SuperInterpolator(Module):
         """Fully pipelined DSP block mockup."""
 
         if self.dsp_arch == "lattice":
-            a = Signal((18, True))
-            b = Signal((18, True))
-            b_reg = Signal((18, True))
-            c = Signal((36, True))
-            d = Signal((18, True))
+            a = Signal((18, True), reset_less=True)
+            b = Signal((18, True), reset_less=True)
+            b_reg = Signal((18, True), reset_less=True)
+            c = Signal((36, True), reset_less=True)
+            d = Signal((18, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
-            ad = Signal((18, True))
-            m = Signal((36, True))
-            p = Signal((36, True))
+            ad = Signal((18, True), reset_less=True)
+            m = Signal((36, True), reset_less=True)
+            p = Signal((36, True), reset_less=True)
         else:  # xilinx dsp arch
-            a = Signal((30, True))
-            b = Signal((18, True))
-            b_reg = Signal((18, True))
-            c = Signal((48, True))
-            d = Signal((25, True))
+            a = Signal((30, True), reset_less=True)
+            b = Signal((18, True), reset_less=True)
+            b_reg = Signal((18, True), reset_less=True)
+            c = Signal((48, True), reset_less=True)
+            d = Signal((25, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
-            ad = Signal((25, True))
-            m = Signal((48, True))
-            p = Signal((48, True))
+            ad = Signal((25, True), reset_less=True)
+            m = Signal((48, True), reset_less=True)
+            p = Signal((48, True), reset_less=True)
 
         mux_p_reg = Signal(2)  # double registered p mux signal
 
