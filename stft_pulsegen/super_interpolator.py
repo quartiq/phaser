@@ -128,8 +128,6 @@ class SuperInterpolator(Module):
 
         # Interpolator mode and dataflow handling
         self.comb += [
-            self.mode2.eq(Mux(r_reg >= 4, 1, 0)),
-            self.mode3.eq(Mux(r_reg >= 8, 1, 0)),
             muxsel0.eq((~self.cic.input.ack) | (self.mode3 & hbf1_step1)),
             self.hbfstop.eq(Mux(muxsel0, 1, 0)),
             self.cic.r.eq(r_reg[2:]),  # r_cic = r_inter//4
@@ -138,6 +136,8 @@ class SuperInterpolator(Module):
             x1__.eq(y[midpoint][width_coef - 1:width_coef - 1 + width_d]),
         ]
         self.sync += [
+            self.mode2.eq(Mux(r_reg >= 4, 1, 0)),
+            self.mode3.eq(Mux(r_reg >= 8, 1, 0)),
             r_reg.eq(self.r),
             If(~self.hbfstop,
                If(~self.mode2 | (self.mode2 & hbf0_step1),
