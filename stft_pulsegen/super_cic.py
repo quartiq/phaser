@@ -166,7 +166,6 @@ class SuperCicUS(Module):
         shifts = np.ceil(np.log2(tweaks ** (n - 1))).astype('int').tolist()
         bitshift_lut_width = int(np.ceil(np.log2(max(shifts))))
         # Nr. bits for the bitshifting LUT. The rest will be gaintweak LUT.
-        print(f'bitshift bits in LUT: {bitshift_lut_width}')
         tweaks = (np.ceil(np.log2(tweaks ** (n - 1))) - np.log2(tweaks ** (n - 1)))
         tweaks = (2 ** tweaks)
         tweaks = tweaks * 2 ** (width_lut - bitshift_lut_width - 1)
