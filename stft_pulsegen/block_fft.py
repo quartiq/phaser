@@ -221,7 +221,7 @@ class Fft(Module):
             If(reduce(and_, pos_r),
                self.stage.eq(self.stage + 1),
                x2p1_adr.eq(1 << self.stage),
-               ).Elif(~self.busy,  #(self.stage == 0) & (pos_r == 0) ,
+               ).Elif(~self.busy,
                       x2p1_adr.eq(0),
                       ).Else(
                 x2p1_adr.eq((Cat(0, pos_r + 1) ^ (1 << self.stage)) >> 1),
@@ -245,7 +245,6 @@ class Fft(Module):
             a_mux.eq(Mux(self.stage == 0, 0, posbit_r)),
             # input multiplexer needs to switch every self.stage cycles (so never in the 0th stage)
             x1p1_adr.eq(pos_r),  # ram 1 is just always sorted
-            # x2p1_adr.eq((Cat(0, pos_r) ^ (1 << self.stage)) >> 1),
             # flip bit at self.stage position to shuffle ram 2;
             # first append 0 at LSB and then shift out to effectively make self.stage-1.
 
