@@ -54,13 +54,12 @@ class SuperCicUS(Module):
         r_reg = Signal.like(self.r)
         f_rst = Signal()
 
-        self.comb += f_rst.eq(self.r != r_reg)  # handle ratechange
+        self.sync += f_rst.eq(self.r != r_reg)  # handle ratechange
 
         # Filter "clocking" from the input. Halts if no new samples.
         self.comb += [
             comb_ce.eq(self.input.ack & self.input.stb),
             self.output.stb.eq(~inp_stall),
-            self.input.ack.eq((i == 0) | inp_stall_reg | (i == r_reg[1:])),
             inp_stall.eq(self.input.ack & ~self.input.stb)
         ]
 
@@ -69,6 +68,7 @@ class SuperCicUS(Module):
         ]
 
         self.sync += [
+            self.input.ack.eq((i == r_reg - 1) | inp_stall | (i == r_reg[1:] - 1)),
             r_reg.eq(self.r),
             If(~inp_stall_reg,
                i.eq(i + 1),
@@ -87,9 +87,9 @@ class SuperCicUS(Module):
 
         # comb stages, one pipeline stage each
         for _ in range(n):
-            old = Signal((width, True))
+            old = Signal((width, True), reset_less=True)
             width += 1
-            diff = Signal((width, True))
+            diff = Signal((width, True), reset_less=True)
             self.sync += [
                 If(comb_ce,
                    old.eq(sig),
@@ -105,9 +105,9 @@ class SuperCicUS(Module):
 
         # zero stuffer, gearbox, and first integrator, one pipeline stage
         width -= 1
-        sig_a = Signal((width, True))
-        sig_b = Signal((width, True))
-        sig_i = Signal((width, True))
+        sig_a = Signal((width, True), reset_less=True)
+        sig_b = Signal((width, True), reset_less=True)
+        sig_i = Signal((width, True), reset_less=True)
         self.comb += [
             sig_i.eq(sig_b + sig),
         ]
@@ -127,11 +127,11 @@ class SuperCicUS(Module):
 
         # integrator stages, two pipeline stages each
         for _ in range(n - 1):
-            sig_a0 = Signal((width, True))
-            sum_ab = Signal((width + 1, True))
+            sig_a0 = Signal((width, True), reset_less=True)
+            sum_ab = Signal((width + 1, True), reset_less=True)
             width += int(b_max - 1)
-            sum_a = Signal((width, True))
-            sum_b = Signal((width, True))
+            sum_a = Signal((width, True), reset_less=True)
+            sum_b = Signal((width, True), reset_less=True)
             self.sync += [
                 If(~inp_stall_reg,
                    sig_a0.eq(sig_a),
@@ -166,7 +166,6 @@ class SuperCicUS(Module):
         shifts = np.ceil(np.log2(tweaks ** (n - 1))).astype('int').tolist()
         bitshift_lut_width = int(np.ceil(np.log2(max(shifts))))
         # Nr. bits for the bitshifting LUT. The rest will be gaintweak LUT.
-        print(f'bitshift bits in LUT: {bitshift_lut_width}')
         tweaks = (np.ceil(np.log2(tweaks ** (n - 1))) - np.log2(tweaks ** (n - 1)))
         tweaks = (2 ** tweaks)
         tweaks = tweaks * 2 ** (width_lut - bitshift_lut_width - 1)
@@ -176,9 +175,9 @@ class SuperCicUS(Module):
         lut = Memory(width_lut, r_max, init=tweaks, name="gaintweaks")
         port = lut.get_port(write_capable=False)
         self.specials += lut, port
-        out = Signal((len(x) + n, True))
-        shift = Signal((bitshift_lut_width, True))
-        temp = Signal((width_lut - bitshift_lut_width + self.width_d, True))
+        out = Signal((len(x) + n, True), reset_less=True)
+        shift = Signal((bitshift_lut_width, True), reset_less=True)
+        temp = Signal((width_lut - bitshift_lut_width + self.width_d, True), reset_less=True)
         tweak = Signal(width_lut - bitshift_lut_width)
         x_reg = Signal.like(x)
         self.sync += [

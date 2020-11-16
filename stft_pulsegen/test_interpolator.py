@@ -64,9 +64,9 @@ class TestInterpolator(unittest.TestCase):
             return 18 + 20 + 50
         if r == 20:
             if (r//4) % 2:
-                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94)
+                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 7 + 5
             else:
-                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 1
+                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 1 + 7 + 5
         else:
             ValueError
 
@@ -131,7 +131,7 @@ class TestInterpolator(unittest.TestCase):
                     y.append(v1)
 
                 yield
-        run_simulation(self.inter, sim(), vcd_name="grr.vcd")
+        run_simulation(self.inter, sim())
         return y
 
     def setUp(self):

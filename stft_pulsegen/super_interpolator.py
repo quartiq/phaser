@@ -10,27 +10,37 @@ from super_cic import SuperCicUS
 
 class SuperInterpolator(Module):
     """Supersampled Interpolator.
+
     Variable rate, >89.5dB image rejection, supersampled (two outputs per cycle) interpolator.
+
     The core always computes two new output samples per clockcycle and ingests an input sample every r/2 cycles.
     Input and output use the misoc stream format, however the input STB signal is ignored and the core uses whatever
     data is presented at the input at the time it needs it. The input ACK is set when a sample is ingested in that cycle.
+
     The ratechange can be dynamically set to r=2 or multiples of 4 via the r input Signal. Other r inputs default to
     the next lower possible ratechange (eg. r=10 will lead to a ratechange of 8).
+
     To achieve the >89.5dB image rejection over all interpolation rates, 3 interpolation filters are used in series.
     Two halfband (HBF) FIR filters, each with a ratechange of 2 and one CIC FIR filter with a variable ratechange.
     For r=2 only the first HBF is used, for r=4 both HBFs are used in series and for r>4 both HBFs and the CIC with
     r_cic=r/4 are engaged.
+
     The HBFs use 18 bit filter coefficients that fit both lattice and xilinx dsp architectures. Rounding is
     implemented using "half a bit" bias at the filter input (which internally has a higher precision) and cutting
     off the lower bits at the end.
+
     Due to the HBF filter dynamics it is possible for the data to overflow if the input is a sharp step change. This
     will produce an unwanted out-of-band output signal but never lead to undefined behaviour. After changing the rate
     input, the interpolator will exhibit a transient phase for a short time. This may produce an unwanted out-of-band
     output signal if the input is nonzero but never lead to undefined behaviour.
+
     The interpolator transition band starts at 80% the input nyquist rate. Input frequencies higher than that will lead
     to aliases in the transition band. For r>4 the droop at the edge of the passband due to the CIC filter is at most
     -1dB. For r=2 and r=4 there is no droop in the passband. Passband ripple is negligible in all cases (<0.0004dB).
+
     freq. responses: https://github.com/quartiq/Phaser_STFT_Pulsegen/blob/master/Interpolation_Filters.ipynb
+
+
     Parameters
     ----------
     width_d: width of the data in- and output
@@ -59,6 +69,7 @@ class SuperInterpolator(Module):
         hbf0_step1 = Signal()  # hbf0 step1 signal if in mode 2
         hbf1_step1 = Signal()
         muxsel0 = Signal()  # necessary bc big expressions in Mux condition dont work
+        r_reg = Signal(l2r)  # Interpolation rate register
 
         nr_dsps = 15
         width_coef = 18
@@ -81,22 +92,22 @@ class SuperInterpolator(Module):
                -418, 0, 69]
         coef_a = []
         for i, coef in enumerate(h_0[: (len(h_0) + 1) // 2: 2]):
-            coef_a.append(Signal((width_coef, True), reset=coef))
+            coef_a.append(Signal((width_coef, True), reset_less=True, reset=coef))
         coef_b = []
         for i, coef in enumerate(h_1[: (len(h_1) + 1) // 2: 2]):
-            coef_b.append(Signal((width_coef, True), reset=coef))
+            coef_b.append(Signal((width_coef, True), reset_less=True, reset=coef))
 
-        x = [Signal((width_d, True)) for _ in range(((len(coef_a) * 2) + 2))]  # input hbf0
-        x_end_l = Signal((width_d, True))
-        x1_ = [Signal((width_d, True)) for _ in range(((len(coef_b) * 2) + 2))]  # input hbf1
-        x1__ = Signal((width_d, True))  # intermediate signal
+        x = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_a) * 2) + 2))]  # input hbf0
+        x_end_l = Signal((width_d, True), reset_less=True)
+        x1_ = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_b) * 2) + 2))]  # input hbf1
+        x1__ = Signal((width_d, True), reset_less=True)  # intermediate signal
 
         if dsp_arch == "lattice":
-            y = [Signal((36, True)) for _ in range(nr_dsps)]
-            y_reg = [Signal((36, True)) for _ in range(((nr_dsps - 1) // 2) + 1)]
+            y = [Signal((36, True), reset_less=True) for _ in range(nr_dsps)]
+            y_reg = [Signal((36, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
         else:  # xilinx dsp arch
-            y = [Signal((48, True)) for _ in range(nr_dsps)]
-            y_reg = [Signal((48, True)) for _ in range(((nr_dsps - 1) // 2) + 1)]
+            y = [Signal((48, True), reset_less=True) for _ in range(nr_dsps)]
+            y_reg = [Signal((48, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
 
         # last stage: supersampled CIC interpolator
         self.submodules.cic = SuperCicUS(width_d=width_d, n=6, r_max=r_max // 4, gaincompensated=True, width_lut=18)
@@ -117,18 +128,17 @@ class SuperInterpolator(Module):
 
         # Interpolator mode and dataflow handling
         self.comb += [
-            muxsel0.eq((~self.cic.input.ack) | (self.mode3 & hbf1_step1)),
+            muxsel0.eq((self.mode3 & ~self.cic.input.ack) | (self.mode3 & hbf1_step1)),
             self.hbfstop.eq(Mux(muxsel0, 1, 0)),
-            self.cic.r.eq(self.r[2:]),  # r_cic = r_inter//4
+            self.cic.r.eq(r_reg[2:]),  # r_cic = r_inter//4
             self.cic.input.data.eq(Mux(hbf1_step1, y[-1][width_coef - 1:width_coef - 1 + width_d], x1_[-1])),
             self.cic.input.stb.eq(self.mode3),
             x1__.eq(y[midpoint][width_coef - 1:width_coef - 1 + width_d]),
         ]
         self.sync += [
-            #self.mode2.eq(Mux(reduce(or_, self.r[1:]), 1, 0)),  # r >= 2
-            #self.mode3.eq(Mux(reduce(or_, self.r[2:]), 1, 0)),  # r >= 4
-            self.mode2.eq(Mux(self.r >= 4, 1, 0)),
-            self.mode3.eq(Mux(self.r >= 8, 1, 0)),
+            self.mode2.eq(Mux(r_reg >= 4, 1, 0)),
+            self.mode3.eq(Mux(r_reg >= 8, 1, 0)),
+            r_reg.eq(self.r),
             If(~self.hbfstop,
                If(~self.mode2 | (self.mode2 & hbf0_step1),
                   Cat(x).eq(Cat(self.input.data, x)),
@@ -248,25 +258,25 @@ class SuperInterpolator(Module):
         """Fully pipelined DSP block mockup."""
 
         if self.dsp_arch == "lattice":
-            a = Signal((18, True))
-            b = Signal((18, True))
-            b_reg = Signal((18, True))
-            c = Signal((36, True))
-            d = Signal((18, True))
+            a = Signal((18, True), reset_less=True)
+            b = Signal((18, True), reset_less=True)
+            b_reg = Signal((18, True), reset_less=True)
+            c = Signal((36, True), reset_less=True)
+            d = Signal((18, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
-            ad = Signal((18, True))
-            m = Signal((36, True))
-            p = Signal((36, True))
+            ad = Signal((18, True), reset_less=True)
+            m = Signal((36, True), reset_less=True)
+            p = Signal((36, True), reset_less=True)
         else:  # xilinx dsp arch
-            a = Signal((30, True))
-            b = Signal((18, True))
-            b_reg = Signal((18, True))
-            c = Signal((48, True))
-            d = Signal((25, True))
+            a = Signal((30, True), reset_less=True)
+            b = Signal((18, True), reset_less=True)
+            b_reg = Signal((18, True), reset_less=True)
+            c = Signal((48, True), reset_less=True)
+            d = Signal((25, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
-            ad = Signal((25, True))
-            m = Signal((48, True))
-            p = Signal((48, True))
+            ad = Signal((25, True), reset_less=True)
+            m = Signal((48, True), reset_less=True)
+            p = Signal((48, True), reset_less=True)
 
         mux_p_reg = Signal(2)  # double registered p mux signal
 
