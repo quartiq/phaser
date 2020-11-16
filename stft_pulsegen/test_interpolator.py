@@ -7,9 +7,9 @@ from super_interpolator import SuperInterpolator
 
 class TestInterpolator(unittest.TestCase):
 
-    @staticmethod
-    def hbf_response(r):
-        assert r in (4, 2), "unupported rate"
+
+    def hbf_response(self, r):
+        assert r in (4, 2), "unsupported rate"
         #  HBF0 impulse response:
         h_0 = [9, 0, -32, 0, 83, 0, -183, 0,
                360, 0, -650, 0, 1103, 0, -1780, 0,
@@ -55,18 +55,21 @@ class TestInterpolator(unittest.TestCase):
             y_full[i] = e >> self.shifts[r]
         return y_full.astype('int').tolist()
 
-    @staticmethod
-    def calc_delay(r):
+
+    def calc_delay(self, r):
         assert (r % 4 == 0) | (r == 2), "unsupported rate"
         if r == 2:
             return 18 + 20
         if r == 4:
-            return 18 + 20 + 50 + 2
-        if r > 4:
+            return 18 + 20 + 50
+        if r == 20:
             if (r//4) % 2:
-                return 18 + 20 + 50 + 2 + 28 + (((r // 4) - 1) * 94)
+                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94)
             else:
-                return 18 + 20 + 50 + 2 + 28 + (((r // 4) - 1) * 94) + 1
+                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 1
+        else:
+            ValueError
+
 
     def interpolator_model(self, x, r):
         bias = (1 << 18 - 1) - 1
@@ -106,7 +109,8 @@ class TestInterpolator(unittest.TestCase):
         def sim():
             yield
             yield self.inter.r.eq(r)
-            yield
+            for _ in range(30):
+                yield
             j = 0
             for i in range((r * 100) + 20):
                 if j < len(x):
@@ -127,7 +131,7 @@ class TestInterpolator(unittest.TestCase):
                     y.append(v1)
 
                 yield
-        run_simulation(self.inter, sim())
+        run_simulation(self.inter, sim(), vcd_name="grr.vcd")
         return y
 
     def setUp(self):
@@ -164,9 +168,11 @@ class TestInterpolator(unittest.TestCase):
         self.assertEqual(y_model, y_sim)
 
     def test_full(self):
-        """test for r>4, hbf0 + hbf1 + cic"""
+        """test for r>4, hbf0 + hbf1 + cic
+        adjust delay for r!=20
+        """
 
-        r = 36
+        r = 20
         y_model = self.interpolator_model(self.x, r)
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
