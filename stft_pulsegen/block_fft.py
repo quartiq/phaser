@@ -99,11 +99,11 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        init = [0] * (n//2)
+        init = [0] * (n // 2)
         init[(n // 4)] = (2 ** (width_i - 2)) - 1000
         init[(n // 8)] = (2 ** (width_i - 2)) - 1000
-        #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
-        #xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        # xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        # xram1 = Memory(width_int * 2, int(n / 2), name="data1")
         xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
@@ -115,7 +115,7 @@ class Fft(Module):
         xram2b_port2 = xram2b.get_port(write_capable=True, mode=READ_FIRST)
         dat_r = Signal(width_int * 2)
         self.specials += xram1, xram1_port1, xram1_port2, xram2a, \
-            xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2
+                         xram2b, xram2a_port1, xram2a_port2, xram2b_port1, xram2b_port2
 
         # Memory Wiring
         a_mux_l, c_mux, a_x2_mux_l, c_x2_mux, x1p1_adr, x1p2_adr, x2p1_adr, x2p2_adr, bfl_we, stage_w_n \
@@ -218,7 +218,14 @@ class Fft(Module):
 
             # position and staging
             If(self.en & self.busy, pos_r.eq(pos_r + 1)),  # count only if enabled; overflows at stage transition
-            If(reduce(and_, pos_r), self.stage.eq(self.stage + 1)),
+            If(reduce(and_, pos_r),
+               self.stage.eq(self.stage + 1),
+               x2p1_adr.eq(1 << self.stage),
+               ).Elif(~self.busy,  #(self.stage == 0) & (pos_r == 0) ,
+                      x2p1_adr.eq(0),
+                      ).Else(
+                x2p1_adr.eq((Cat(0, pos_r + 1) ^ (1 << self.stage)) >> 1),
+            ),
             If(reduce(and_, pos_w) & ~(stage_w == self.log2n - 1), stage_w.eq(stage_w + 1)),
             If(pos_w == (int(self.n / 2) - 2), stage_w_n.eq(stage_w_n + 1)),  # grr, this is ugly
             # dont count up write pos at ultimate stage so c_x2_mux is still in the right position
@@ -238,7 +245,7 @@ class Fft(Module):
             a_mux.eq(Mux(self.stage == 0, 0, posbit_r)),
             # input multiplexer needs to switch every self.stage cycles (so never in the 0th stage)
             x1p1_adr.eq(pos_r),  # ram 1 is just always sorted
-            x2p1_adr.eq((Cat(0, pos_r) ^ (1 << self.stage)) >> 1),
+            # x2p1_adr.eq((Cat(0, pos_r) ^ (1 << self.stage)) >> 1),
             # flip bit at self.stage position to shuffle ram 2;
             # first append 0 at LSB and then shift out to effectively make self.stage-1.
 
