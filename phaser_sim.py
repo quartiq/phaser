@@ -109,8 +109,8 @@ class Phaser(Module):
             ("fft_start", Register()),  # starts fft computation
             ("interpolation_rate", Register()),  # set interpolation rate
 
-            ("fft_busy", Register()),  # fft core in computation
-            ("pulsegen_busy", Register()),  # pulsegen in pulse ejection
+            ("fft_busy", Register(write=False)),  # fft core in computation
+            ("pulsegen_busy", Register(write=False)),  # pulsegen in pulse ejection
         ])
 
 
@@ -124,10 +124,18 @@ class Phaser(Module):
             yield
 
             if i == 10:
-                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<8 | 1<<16)
-                yield self.link.checker.frame_stb.eq(1)
+                yield self.link.checker.frame.eq(1 | 50 << 1 | 1 << 8 | 1 << 16)  # see decoder header
+                yield self.link.checker.frame_stb.eq(1)  # update fft_load reg on first frame
                 yield
                 yield self.link.checker.frame_stb.eq(0)
+                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<8 | 1<<16 | 1<<20 | 1<<(20+32) | 767<<(20+96))  # see decoder header
+                yield
+                yield self.link.checker.frame_stb.eq(1)  # second frame contains data
+                yield
+                yield self.link.checker.frame_stb.eq(0)
+
+
+
             # x = yield self.out0
             # if x > 700: print(x)
 
