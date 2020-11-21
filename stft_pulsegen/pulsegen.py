@@ -7,6 +7,7 @@ from misoc.interconnect.stream import Endpoint
 
 from block_fft import Fft
 from super_interpolator import SuperInterpolator
+from operator import and_
 
 
 class Pulsegen(Module):
@@ -22,8 +23,9 @@ class Pulsegen(Module):
         self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
         self.submodules.inter_q = inter_q = SuperInterpolator(r_max=1024)
 
-        cnt = Signal(10)
-        pos = Signal(int(np.log2(size_fft)))
+        pos = Signal(int(np.log2(size_fft)))  # position in fft mem
+        p = Signal(16, reset=0)  # number repeats
+
 
         self.comb += [
             inter_i.input.data.eq(fft.x_out[width_d:]),
@@ -31,24 +33,37 @@ class Pulsegen(Module):
             fft.en.eq(1),
             fft.scaling.eq(0xff),
             fft.x_out_adr.eq(pos),
-            # inter_i.r.eq(2),
-            # inter_q.r.eq(2),
         ]
 
         self.sync += [
-            cnt.eq(cnt + 1),
-            # If(cnt[2], fft.start.eq(1)),
+
+            # pulse start/stop logic
+
             If(inter_q.input.ack,
-               pos.eq(pos + 1))
+               pos.eq(pos + 1)),
+            If(reduce(and_, pos),
+               p.eq(p+1)),
+
+
+
+
+            # fft load logic
+
+            If(decoder.get("fft_load", "read") == 1,
+
+
+
+            ),
         ]
 
-    def sim(self):
-        for i in range(1500):
-            yield
-            # x = yield self.out0
-            # if x > 700: print(x)
 
-
-if __name__ == "__main__":
-    test = Pulsegen()
-    run_simulation(test, test.sim(), vcd_name="pulsegen.vcd")
+#     def sim(self):
+#         for i in range(1500):
+#             yield
+#             # x = yield self.out0
+#             # if x > 700: print(x)
+#
+#
+# if __name__ == "__main__":
+#     test = Pulsegen()
+#     run_simulation(test, test.sim(), vcd_name="pulsegen.vcd")

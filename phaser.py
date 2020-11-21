@@ -124,6 +124,7 @@ class Phaser(Module):
             ("pulse_settings", Register()),  # general pulse settings like immediate pulse emission
             ("fft_load", Register()),  # enables fft loading. data samples will be written into fft mem
             ("fft_size", Register()),  # (virtually) sets the fft size
+            ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
             ("repeater", Register()),  # number fft repeats
             ("fft_start", Register()),  # starts fft computation
             ("interpolation_rate", Register()),  # set interpolation rate
