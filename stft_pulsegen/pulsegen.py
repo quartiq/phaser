@@ -17,7 +17,7 @@ class Pulsegen(Module):
     width_d:
     """
 
-    def __init__(self, width_d=16, size_fft=64):
+    def __init__(self, decoder, width_d=16, size_fft=64):
         self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_int=16, width_wram=16)
         self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
         self.submodules.inter_q = inter_q = SuperInterpolator(r_max=1024)
