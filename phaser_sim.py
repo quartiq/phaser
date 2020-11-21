@@ -4,7 +4,7 @@ from misoc.cores.duc import PhasedDUC
 
 from crg import CRG
 from link_sim import Link  # sim import
-from decode import Decode, Register
+from decode_sim import Decode, Register  # sim import
 from dac_data import DacData
 from stft_pulsegen.pulsegen import Pulsegen
 
@@ -122,6 +122,12 @@ class Phaser(Module):
     def sim(self):
         for i in range(150):
             yield
+
+            if i == 10:
+                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<8 | 1<<16)
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
             # x = yield self.out0
             # if x > 700: print(x)
 
