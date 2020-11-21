@@ -105,12 +105,12 @@ class Phaser(Module):
             ("fft_load", Register()),  # enables fft loading. data samples will be written into fft mem
             ("fft_size", Register()),  # (virtually) sets the fft size
             ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
-            ("repeater", Register()),  # number fft repeats
+            ("repeater", Register(), Register()),  # number fft repeats
             ("fft_start", Register()),  # starts fft computation
-            ("interpolation_rate", Register()),  # set interpolation rate
+            ("interpolation_rate", Register(), Register()),  # set interpolation rate
 
-            ("fft_busy", Register(write=False)),  # fft core in computation
-            ("pulsegen_busy", Register(write=False)),  # pulsegen in pulse ejection
+            ("fft_busy", Register()),  # fft core in computation
+            ("pulsegen_busy", Register()),  # pulsegen in pulse ejection
         ])
 
 
@@ -120,24 +120,43 @@ class Phaser(Module):
 
 
     def sim(self):
-        for i in range(150):
+        for i in range(500):
             yield
 
             if i == 10:
-                yield self.link.checker.frame.eq(1 | 50 << 1 | 1 << 8 | 1 << 16)  # see decoder header
+                yield self.link.checker.frame.eq(1 | 50 << 1 | 1 << 8 | 1 << 16)  # assert fft load
                 yield self.link.checker.frame_stb.eq(1)  # update fft_load reg on first frame
                 yield
                 yield self.link.checker.frame_stb.eq(0)
-                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<8 | 1<<16 | 1<<20 | 1<<(20+32) | 767<<(20+96))  # see decoder header
+                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
+                # write some data to first and second coef and de-assert fft_load
                 yield
                 yield self.link.checker.frame_stb.eq(1)  # second frame contains data
                 yield
                 yield self.link.checker.frame_stb.eq(0)
+                yield self.link.checker.frame.eq(1 | 56 << 1 | 1 << 8 | 1 << 16)  # fft start
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
+
+            if i == 20:
+                yield self.link.checker.frame.eq(1 | 49 << 1 | 1 << 8 | 1 << 16)  # set pulse settings
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
+                yield
+                yield self.link.checker.frame.eq(1 | 55<<1 | 3 << 8 | 1 << 16)  # set nr repeats
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
+                yield
+                yield self.link.checker.frame.eq(1 | 48<<1 | 1 << 8 | 1 << 16)  # emit pulse as soon as fft is done
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
 
 
 
-            # x = yield self.out0
-            # if x > 700: print(x)
 
 if __name__ == "__main__":
     top = Phaser()

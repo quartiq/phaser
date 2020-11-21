@@ -11,7 +11,12 @@ from operator import and_
 
 
 class Fft_load(Module):
-    """ fft coefficient loading logic"""
+    """ fft coefficient loading logic
+
+    In the first frame the fft_load reg is asserted, leading to the next frame writhing data into fft memory.
+    The last fft coeff frame has to de-assert fft_load.
+
+    """
 
     def __init__(self, decoder, fft, coef_per_frame):
         data = [Signal(fft.width_i * 2, reset_less=True)
@@ -59,22 +64,51 @@ class Pulsegen(Module):
 
         pos = Signal(int(np.log2(size_fft)))  # position in fft mem
         p = Signal(16, reset=0)  # number repeats
+        pdone = Signal(reset=1)  # pulse done signal
 
         self.comb += [
             inter_i.input.data.eq(fft.x_out[width_d:]),
             inter_q.input.data.eq(fft.x_out[:width_d]),
-            fft.en.eq(1),
-            fft.scaling.eq(0xff),
             fft.x_out_adr.eq(pos),
+            fft.en.eq(1),
         ]
 
         self.sync += [
 
-            # pulse start/stop logic
+            # pulsegen settings
+            inter_i.r.eq(decoder.get("interpolation_rate", "read")),
+            inter_q.r.eq(decoder.get("interpolation_rate", "read")),
+            fft.scaling.eq(decoder.get("fft_shiftmask", "read")),
+            If(decoder.get("pulse_settings", "read") == 0,  # continous fft outpout
+               If(inter_i.input.ack,
+                  pos.eq(pos + 1)),
 
-            If(inter_q.input.ack,
-               pos.eq(pos + 1)),
-            If(reduce(and_, pos),
-               p.eq(p + 1)),
+               ).Elif((decoder.get("pulse_settings", "read") == 1) & ~fft.busy,  # standard pulse mode with p repeats
+                      If((decoder.get("pulse_trigger", "read") == 1) & (pdone == 1),
+                         # TODO: check for fft/pulse busy/reasserted pulse_trigger to restart pulse or not??
+                         p.eq(decoder.get("repeater", "read")),
+                         decoder.get("pulsegen_busy", "write").eq(1),
+                         decoder.get("pulse_trigger", "write").eq(0),  # de-assert trigger
+                         pdone.eq(0),
+                         pos.eq(0),
+                         ).Elif(pdone == 0,
+                                If(inter_i.input.ack,
+                                   pos.eq(pos + 1)),
+                                If(reduce(and_, pos),
+                                   p.eq(p - 1)),
+                                If(p == 0,
+                                   pdone.eq(1),
+                                   pos.eq(0),
+                                   decoder.get("pulsegen_busy", "write").eq(0),
+                                   ),
+                                ).Else(
+                          pdone.eq(1),
+                          pos.eq(0),
+                          decoder.get("pulsegen_busy", "write").eq(0),
+                      ),
+                      ),
+            If(decoder.get("fft_start", "read") == 1,
+               fft.start.eq(1)),
+            decoder.get("fft_busy", "write").eq(fft.busy),
 
         ]
