@@ -99,11 +99,12 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        # init = [0] * (n // 2)
-        # init[(n // 4)] = (2 ** (width_i - 2)) - 1000
-        # init[(n // 8)] = (2 ** (width_i - 2)) - 1000
-        xram1 = Memory(width_int * 2, int(n / 2), name="data1")
-        # xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
+        init = [0] * (n // 2)
+        init[(n // 4)] = (2 ** (width_i - 2)) - 1000
+        init[(n // 8)] = (2 ** (width_i - 2)) - 1000
+        # xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        # xram1 = Memory(width_int * 2, int(n / 2), name="data1")
+        xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
         xram1_port1 = xram1.get_port(write_capable=True, mode=READ_FIRST)
@@ -206,6 +207,7 @@ class Fft(Module):
                stage_w.eq(-1),
                stage_w_n.eq(-1),
                pos_r.eq(0),
+               pos_w.eq(-self.PIPE_DELAY),
                self.scaling_reg.eq(self.scaling),
                # starting at scaling_reg stage, the bfl outputs are not scaled any more.
                ),
@@ -216,11 +218,14 @@ class Fft(Module):
                ),
 
             # position and staging
-            If(self.en & self.busy, pos_r.eq(pos_r + 1)),  # count only if enabled; overflows at stage transition
+            If(self.en & self.busy,  # count only if enabled; overflows at stage transition
+               pos_r.eq(pos_r + 1),
+               pos_w.eq(pos_w + 1),
+               ),
             If(reduce(and_, pos_r),
                self.stage.eq(self.stage + 1),
                x2p1_adr.eq(1 << self.stage),
-               ).Elif(~self.busy,  #(self.stage == 0) & (pos_r == 0) ,
+               ).Elif(~self.busy,
                       x2p1_adr.eq(0),
                       ).Else(
                 x2p1_adr.eq((Cat(0, pos_r + 1) ^ (1 << self.stage)) >> 1),
@@ -231,12 +236,13 @@ class Fft(Module):
             If(reduce(and_, pos_w) & reduce(and_, stage_w) & (self.busy == 1), bfl_we.eq(1)),
             # enable write on next (stage_w==0) cycle
             a_mux_l.eq(a_mux),  # a_mux is needed one cycle later to route data output of ram
-            a_x2_mux_l.eq(a_x2_mux)
+            a_x2_mux_l.eq(a_x2_mux),
+
+            [posbit_w.eq(Array(pos_w+1)[stage_w_n]),  # Mux for write position bits
+             If(stage_w_n >= self.log2n - 1, posbit_w.eq(0))]
         ]
 
         self.comb += posbit_r.eq(Array(pos_r)[self.stage - 1])  # Mux for read position bits
-        self.comb += [posbit_w.eq(Array(pos_w)[stage_w]),  # Mux for write position bits
-                      If(stage_w >= self.log2n - 1, posbit_w.eq(0))]
 
         self.comb += [
             # fetching logic
@@ -244,12 +250,11 @@ class Fft(Module):
             a_mux.eq(Mux(self.stage == 0, 0, posbit_r)),
             # input multiplexer needs to switch every self.stage cycles (so never in the 0th stage)
             x1p1_adr.eq(pos_r),  # ram 1 is just always sorted
-            # x2p1_adr.eq((Cat(0, pos_r) ^ (1 << self.stage)) >> 1),
             # flip bit at self.stage position to shuffle ram 2;
             # first append 0 at LSB and then shift out to effectively make self.stage-1.
 
             # writeback logic
-            pos_w.eq(pos_r - self.PIPE_DELAY),  # writeback needs to be delayed due to pipelining
+            # pos_w.eq(pos_r - self.PIPE_DELAY),  # writeback needs to be delayed due to pipelining
             c_x2_mux.eq(~stage_w[0]),  # use last bit of stage to toggle between x2 mems
             c_mux.eq(posbit_w),  # toggle c mux at stage bit of write position
             x1p2_adr.eq(pos_w),  # ram 1 is just always sorted
@@ -301,12 +306,12 @@ class Fft(Module):
             m[3].eq(wd * br_reg[3]),  # 5
             m[4].eq(m[1]),  # 5
             m[5].eq(m[1]),  # 5
-            m[6].eq(m[4] - m[2]),  # 6
-            m[7].eq(m[5] - m[3]),  # 6
-            cr.eq((ar_reg[5] + m[6][self.w_p:]) >> s),  # 7
-            ci.eq((ai_reg[5] + m[7][self.w_p:]) >> s),  # 7
-            dr.eq((ar_reg[5] - m[6][self.w_p:]) >> s),  # 7
-            di.eq((ai_reg[5] - m[7][self.w_p:]) >> s),  # 7
+            m[6].eq((m[4] - m[2]) >> self.w_p),  # 6
+            m[7].eq((m[5] - m[3]) >> self.w_p),  # 6
+            cr.eq((ar_reg[5] + m[6]) >> s),  # 7
+            ci.eq((ai_reg[5] + m[7]) >> s),  # 7
+            dr.eq((ar_reg[5] - m[6]) >> s),  # 7
+            di.eq((ai_reg[5] - m[7]) >> s),  # 7
         ]
         return cr, ci, dr, di
 
