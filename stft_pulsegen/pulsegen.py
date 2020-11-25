@@ -108,7 +108,9 @@ class Pulsegen(Module):
                       ),
                       ),
             If(decoder.get("fft_start", "read") == 1,
-               fft.start.eq(1)),
+               fft.start.eq(1)).Else(
+                fft.start.eq(0)
+            ),
             decoder.get("fft_busy", "write").eq(fft.busy),
 
         ]
