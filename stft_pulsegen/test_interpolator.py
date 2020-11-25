@@ -59,14 +59,14 @@ class TestInterpolator(unittest.TestCase):
     def calc_delay(self, r):
         assert (r % 4 == 0) | (r == 2), "unsupported rate"
         if r == 2:
-            return 18 + 20
+            return 18 + 20 + 2
         if r == 4:
-            return 18 + 20 + 50
+            return 18 + 20 + 50 + 6
         if r == 20:
             if (r//4) % 2:
-                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 7 + 5
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 7 + 5
             else:
-                return 18 + 20 + 50 + 28 + 6 + (((r // 4) - 1) * 94) + 1 + 7 + 5
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 1 + 7 + 5
         else:
             ValueError
 
@@ -131,7 +131,7 @@ class TestInterpolator(unittest.TestCase):
                     y.append(v1)
 
                 yield
-        run_simulation(self.inter, sim())
+        run_simulation(self.inter, sim(), vcd_name="inter.vcd")
         return y
 
     def setUp(self):
@@ -160,11 +160,13 @@ class TestInterpolator(unittest.TestCase):
     def test_hbf01(self):
         """test for r=4, hbf0 and hbf1 used"""
         r = 4
-
         y_model = self.interpolator_model(self.x, r)
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
         y_sim = y_sim[delay: delay + len(y_model)]
+
+        print(y_model)
+        print(y_sim)
         self.assertEqual(y_model, y_sim)
 
     def test_full(self):
@@ -177,4 +179,6 @@ class TestInterpolator(unittest.TestCase):
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
         y_sim = y_sim[delay: delay + len(y_model)]
+        print(y_model)
+        print(y_sim)
         self.assertEqual(y_model, y_sim)

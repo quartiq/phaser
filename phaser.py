@@ -61,6 +61,7 @@ class Phaser(Module):
             ("gw_rev", Register(write=False)),
             # configuration (clk_sel, dac_resetb, dac_sleep,
             # dac_txena, trf0_ps, trf1_ps, att0_rstn, att1_rstn)
+            # cfg[2:4] = 3  pulsegen mode
             ("cfg", Register()),
             # status (dac_alarm, trf0_ld, trf1_ld, term0_stat,
             # term1_stat, spi_idle)
@@ -117,8 +118,19 @@ class Phaser(Module):
                           Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
-            ("fft_start", Register()),
-            ("interpolation_rate", Register()),
+
+            # STFT regs
+            ("pulse_trigger", Register()),  # triggers immediate pulse emission
+            ("pulse_settings", Register()),  # general pulse settings like immediate pulse emission
+            ("fft_load", Register()),  # enables fft loading. data samples will be written into fft mem
+            ("fft_size", Register()),  # (virtually) sets the fft size
+            ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
+            ("repeater", Register()),  # number fft repeats
+            ("fft_start", Register()),  # starts fft computation
+            ("interpolation_rate", Register()),  # set interpolation rate
+
+            ("fft_busy", Register()),  # fft core in computation
+            ("pulsegen_busy", Register()),  # pulsegen in pulse ejection
         ])
 
         dac_ctrl = platform.request("dac_ctrl")
@@ -182,12 +194,6 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
-        self.submodules.pulsegen = pulsegen = Pulsegen()
-        self.comb += [
-            pulsegen.fft.start.eq(self.decoder.get("fft_start", "read")),
-            pulsegen.inter_q.r.eq(self.decoder.get("interpolation_rate", "read"))
-        ]
-
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
@@ -196,6 +202,11 @@ class Phaser(Module):
             self.dac.data_sync.eq(self.decoder.stb),
             self.dac.sync_dly.eq(self.decoder.get("sync_dly", "write")),
         ]
+
+        # stft pulsegen
+        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder)
+
+
         for ch in range(2):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
@@ -235,17 +246,12 @@ class Phaser(Module):
                 ),
             ]
 
-
+            # stft
             self.sync += [
                 If(cfg[2:4] == 2,  # stft
-                   # self.dac.data[0][ch].eq(pulsegen.fft.x_out[:16]),
-                   # self.dac.data[2][ch].eq(pulsegen.fft.x_out[:16]),
-                   #
-                   # self.dac.data[1][ch].eq(pulsegen.fft.x_out[16:]),
-                   # self.dac.data[3][ch].eq(pulsegen.fft.x_out[16:]),
 
-                    self.dac.data[0][ch].eq(pulsegen.inter_q.output.data0),
-                    self.dac.data[2][ch].eq(pulsegen.inter_q.output.data1),
+                    self.dac.data[0][ch].eq(pulsegen.inter_i.output.data0),
+                    self.dac.data[2][ch].eq(pulsegen.inter_i.output.data1),
 
                     self.dac.data[1][ch].eq(pulsegen.inter_q.output.data0),
                     self.dac.data[3][ch].eq(pulsegen.inter_q.output.data1),

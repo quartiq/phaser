@@ -97,9 +97,9 @@ class SuperInterpolator(Module):
         for i, coef in enumerate(h_1[: (len(h_1) + 1) // 2: 2]):
             coef_b.append(Signal((width_coef, True), reset_less=True, reset=coef))
 
-        x = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_a) * 2) + 2))]  # input hbf0
+        x = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_a) * 2) + 3))]  # input hbf0
         x_end_l = Signal((width_d, True), reset_less=True)
-        x1_ = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_b) * 2) + 2))]  # input hbf1
+        x1_ = [Signal((width_d, True), reset_less=True) for _ in range(((len(coef_b) * 2) + 3))]  # input hbf1
         x1__ = Signal((width_d, True), reset_less=True)  # intermediate signal
 
         if dsp_arch == "lattice":
@@ -144,7 +144,7 @@ class SuperInterpolator(Module):
                   Cat(x).eq(Cat(self.input.data, x)),
                   ),
                hbf0_step1.eq(~hbf0_step1),
-               x_end_l.eq(x[-4]),  # last sample in inputchain (plus dsp reg delay) needs to be delayed by one clk more.
+               x_end_l.eq(x[-5]),  # last sample in inputchain (plus dsp reg delay) needs to be delayed by one clk more.
 
                # input to second hbf
                Cat(x1_).eq(Cat(Mux(hbf0_step1, x1__, x[-2]), x1_)),
@@ -162,16 +162,16 @@ class SuperInterpolator(Module):
                     If(~self.mode2,
                        mux_p.eq(1),
                        a.eq(x[i * 2]),
-                       d.eq(x[-3]),  # third to last bc one extra samples for midpoint output
+                       d.eq(x[-4]),  # fourth to last bc extra samples for midpoint output
                        b.eq(coef_a[i]),
                        ).Else(  # if in mode 2
                         If(~hbf0_step1,
-                           mux_p.eq(1),
+                           mux_p.eq(0),
                            a.eq(x[i * 4]),
                            d.eq(x_end_l),
-                           b.eq(coef_a[i * 2]),
+                           b.eq(coef_a[(i * 2)]),
                            ).Else(
-                            mux_p.eq(0),
+                            mux_p.eq(1),
                             a.eq(x[(i * 4) + 1]),
                             d.eq(x_end_l),
                             b.eq(coef_a[(i * 2) + 1]),
@@ -179,7 +179,7 @@ class SuperInterpolator(Module):
                     )
                 ]
                 self.sync += [
-                    If(~hbf0_step1 & ~self.hbfstop,
+                    If(hbf0_step1 & ~self.hbfstop,
                        y_reg[i].eq(p)
                        )
                 ]
@@ -197,16 +197,16 @@ class SuperInterpolator(Module):
                     If(~self.mode2,
                        mux_p.eq(1),
                        a.eq(x[i * 2]),
-                       d.eq(x[-3]),  # third to last bc one extra samples for midpoint output
+                       d.eq(x[-4]),  # fourth to last bc extra samples for midpoint output
                        b.eq(coef_a[i]),
                        ).Else(  # if in mode 2
                         If(~hbf0_step1,
-                           mux_p.eq(1),
+                           mux_p.eq(0),
                            a.eq(x[i * 4]),
                            d.eq(x_end_l),
                            b.eq(coef_a[i * 2]),
                            ).Else(
-                            mux_p.eq(0),
+                            mux_p.eq(1),
                             a.eq(x[(i * 4) + 1]),
                             d.eq(x_end_l),
                             b.eq(0),
@@ -220,14 +220,14 @@ class SuperInterpolator(Module):
                     If(~self.mode2,
                        mux_p.eq(1),
                        a.eq(x[i * 2]),
-                       d.eq(x[-3]),  # third to last bc one extra samples for midpoint output
+                       d.eq(x[-4]),  # fourth to last bc extra samples for midpoint output
                        b.eq(coef_a[i]),
                        y[i].eq(p),
                        c.eq(y[i - 1])
                        ).Else(
                         mux_p.eq(1),
                         a.eq(x1_[(i - midpoint - 1) * 2]),
-                        d.eq(x1_[-3]),  # third to last bc one extra samples for midpoint output
+                        d.eq(x1_[-4]),
                         b.eq(coef_b[i - midpoint - 1]),
                         y[i].eq(p),
                         c.eq(bias)
@@ -240,14 +240,14 @@ class SuperInterpolator(Module):
                     If(~self.mode2,
                        mux_p.eq(1),
                        a.eq(x[i * 2]),
-                       d.eq(x[-3]),  # third to last bc one extra samples for midpoint output
+                       d.eq(x[-4]),  # fourth to last bc extra samples for midpoint output
                        b.eq(coef_a[i]),
                        y[i].eq(p),
                        c.eq(y[i - 1])
                        ).Else(
                         mux_p.eq(1),
                         a.eq(x1_[(i - midpoint - 1) * 2]),
-                        d.eq(x1_[-3]),  # third to last bc one extra samples for midpoint output
+                        d.eq(x1_[-4]),
                         b.eq(coef_b[i - midpoint - 1]),
                         y[i].eq(p),
                         c.eq(y[i - 1])
@@ -260,7 +260,6 @@ class SuperInterpolator(Module):
         if self.dsp_arch == "lattice":
             a = Signal((18, True), reset_less=True)
             b = Signal((18, True), reset_less=True)
-            b_reg = Signal((18, True), reset_less=True)
             c = Signal((36, True), reset_less=True)
             d = Signal((18, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
@@ -270,7 +269,6 @@ class SuperInterpolator(Module):
         else:  # xilinx dsp arch
             a = Signal((30, True), reset_less=True)
             b = Signal((18, True), reset_less=True)
-            b_reg = Signal((18, True), reset_less=True)
             c = Signal((48, True), reset_less=True)
             d = Signal((25, True), reset_less=True)
             mux_p = Signal()  # accumulator mux
@@ -278,16 +276,24 @@ class SuperInterpolator(Module):
             m = Signal((48, True), reset_less=True)
             p = Signal((48, True), reset_less=True)
 
-        mux_p_reg = Signal(2)  # double registered p mux signal
+        mux_p_reg = Signal(2, reset_less=True)  # double registered p mux signal
+        c_reg = Signal.like(c)
+        a_reg = Signal.like(a)
+        d_reg = Signal.like(d)
+        b_reg = [Signal.like(b) for _ in range(2)]
 
         self.sync += [
             If(~self.hbfstop,
                Cat(mux_p_reg).eq(Cat(mux_p, mux_p_reg)),
-               b_reg.eq(b),
-               ad.eq(a + d),
-               m.eq(ad * b_reg),
+               a_reg.eq(a),
+               Cat(b_reg).eq(Cat(b, b_reg)),
+               c_reg.eq(c),
+               d_reg.eq(d),
+               ad.eq(a_reg + d_reg),
+               m.eq(ad * b_reg[-1]),  # b is double piped to be in line with a+d
                If(~mux_p_reg[-1], p.eq(p + m)
                   ).Else(p.eq(m + c))
                )
         ]
+
         return a, b, c, d, mux_p, p
