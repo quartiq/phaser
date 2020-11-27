@@ -93,11 +93,11 @@ class SuperCicUS(Module):
             self.sync += [
                 If(comb_ce,
                    old.eq(sig),
-                   diff.eq(sig - old)
-                   ),
-                If(f_rst,
-                   old.eq(0),
-                   diff.eq(0)
+                   diff.eq(sig - old),
+                   If(f_rst,
+                      old.eq(0),
+                      diff.eq(0)
+                      )
                    )
             ]
 

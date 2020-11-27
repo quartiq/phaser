@@ -164,9 +164,6 @@ class TestInterpolator(unittest.TestCase):
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
         y_sim = y_sim[delay: delay + len(y_model)]
-
-        print(y_model)
-        print(y_sim)
         self.assertEqual(y_model, y_sim)
 
     def test_full(self):
@@ -179,6 +176,4 @@ class TestInterpolator(unittest.TestCase):
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
         y_sim = y_sim[delay: delay + len(y_model)]
-        print(y_model)
-        print(y_sim)
         self.assertEqual(y_model, y_sim)
