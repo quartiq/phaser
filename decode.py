@@ -145,6 +145,7 @@ class Decode(Module):
         body = Signal(n_samples*b_sample)
         self.frame = Signal(len(body) + len(header))
         self.stb = Signal()
+        self.fft_stb = Signal()
         self.response = Signal(8)
         self.comb += [
             Cat(header.raw_bits(), body).eq(self.frame),
@@ -156,6 +157,7 @@ class Decode(Module):
         self.comb += [
             self.zoh.body.eq(body),
             self.zoh.body_stb.eq(self.stb & (header.type == 1)),
+            self.fft_stb.eq(self.stb & (header.type == 2)),
         ]
 
         self.interpolate = []

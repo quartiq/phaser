@@ -140,11 +140,12 @@ class Decode(Module):
     a bus of registers from the metadata.
     """
     def __init__(self, b_sample, n_channel, n_mux, t_frame):
-        n_samples = n_mux*n_channel*2
+        n_samples = n_mux * n_channel * 2
         header = Record(header_layout)
-        body = Signal(n_samples*b_sample)
+        body = Signal(n_samples * b_sample)
         self.frame = Signal(len(body) + len(header))
         self.stb = Signal()
+        self.fft_stb = Signal()
         self.response = Signal(8)
         self.comb += [
             Cat(header.raw_bits(), body).eq(self.frame),
@@ -156,11 +157,12 @@ class Decode(Module):
         self.comb += [
             self.zoh.body.eq(body),
             self.zoh.body_stb.eq(self.stb & (header.type == 1)),
+            self.fft_stb.eq(self.stb & (header.type == 2)),
         ]
 
         self.interpolate = []
         self.data = [[Record(complex(16)) for _ in range(n_channel)]
-                         for _ in range(2)]
+                     for _ in range(2)]
         # for ch in range(n_channel):
         #     for iq in "iq":
         #         inter = InterpolateChannel()

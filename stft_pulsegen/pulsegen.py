@@ -26,13 +26,19 @@ class Fft_load(Module):
 
         datapos = Signal(int(np.ceil(np.log2(coef_per_frame + 1))))
 
+        self.test = Signal()
+        self.cnt = Signal(28)
+
         self.comb += [
             fft.x_in.eq(data[0]),
             fft.x_in_adr.eq(b_adr),
         ]
 
         self.sync += [
-            If(decoder.stb & decoder.get("fft_load", "read") == 1,  # buffer addr and data if new frame in fft load mode
+
+            self.cnt.eq(self.cnt + 1),
+            If(decoder.fft_stb,  # buffer addr and data if new frame in fft load mode
+               self.test.eq(1),
                b_adr.eq(decoder.zoh.body[:fft.width_i * 2]),
                Cat(data).eq(decoder.zoh.body[fft.width_i * 2:fft.width_i * 2 * (1 + coef_per_frame)]),
                datapos.eq(0),

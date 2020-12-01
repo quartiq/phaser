@@ -102,7 +102,6 @@ class Phaser(Module):
             # STFT regs
             ("pulse_trigger", Register()),  # triggers immediate pulse emission
             ("pulse_settings", Register()),  # general pulse settings like immediate pulse emission
-            ("fft_load", Register()),  # enables fft loading. data samples will be written into fft mem
             ("fft_size", Register()),  # (virtually) sets the fft size
             ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
             ("repeater", Register(), Register()),  # number fft repeats
@@ -124,33 +123,44 @@ class Phaser(Module):
             yield
 
             if i == 10:
-                yield self.link.checker.frame.eq(1 | 50 << 1 | 1 << 8 | 1 << 16)  # assert fft load
-                yield self.link.checker.frame_stb.eq(1)  # update fft_load reg on first frame
-                yield
-                yield self.link.checker.frame_stb.eq(0)
-                yield self.link.checker.frame.eq(1 | 50<<1 | 1<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
+                # yield self.link.checker.frame.eq(1 | 50 << 1 | 1 << 8 | 1 << 16)  # assert fft load
+                # yield self.link.checker.frame_stb.eq(1)  # update fft_load reg on first frame
+                # yield
+                # yield self.link.checker.frame_stb.eq(0)
+                yield self.link.checker.frame.eq(1 | 2<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
                 # write some data to first and second coef and de-assert fft_load
                 yield
                 yield self.link.checker.frame_stb.eq(1)  # second frame contains data
                 yield
                 yield self.link.checker.frame_stb.eq(0)
-                yield self.link.checker.frame.eq(1 | 56 << 1 | 1 << 8 | 1 << 16)  # fft start
-                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield
+                yield
+                yield
+                yield self.link.checker.frame.eq(1 | 55 << 1 | 1 << 8 | 2<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
+                # write some data to first and second coef and de-assert fft_load
+                yield
+                yield self.link.checker.frame_stb.eq(1)  # second frame contains data
                 yield
                 yield self.link.checker.frame_stb.eq(0)
 
+                # yield self.link.checker.frame.eq(1 | 56 << 1 | 1 << 8 | 1 << 16)  # fft start
+                # yield self.link.checker.frame_stb.eq(1)
+                # yield
+                # yield self.link.checker.frame_stb.eq(0)
+
             if i == 20:
-                yield self.link.checker.frame.eq(1 | 49 << 1 | 1 << 8 | 1 << 16)  # set pulse settings
+                yield self.link.checker.frame.eq(1 | 49 << 1 | 1 << 8 )  # set pulse settings
                 yield self.link.checker.frame_stb.eq(1)
                 yield
                 yield self.link.checker.frame_stb.eq(0)
                 yield
-                yield self.link.checker.frame.eq(1 | 55<<1 | 3 << 8 | 1 << 16)  # set nr repeats
+                yield self.link.checker.frame.eq(1 | 54<<1 | 4 << 8 )  # set nr repeats
                 yield self.link.checker.frame_stb.eq(1)
                 yield
                 yield self.link.checker.frame_stb.eq(0)
                 yield
-                yield self.link.checker.frame.eq(1 | 48<<1 | 1 << 8 | 1 << 16)  # emit pulse as soon as fft is done
+                yield self.link.checker.frame.eq(1 | 48<<1 | 1 << 8 )  # emit pulse as soon as fft is done
                 yield self.link.checker.frame_stb.eq(1)
                 yield
                 yield self.link.checker.frame_stb.eq(0)
