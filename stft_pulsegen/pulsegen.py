@@ -21,7 +21,7 @@ class Fft_load(Module):
     def __init__(self, decoder, fft, coef_per_frame):
         data = [Signal(fft.width_i * 2, reset_less=True)
                 for _ in range(coef_per_frame)]
-        b_adr = Signal.like(fft.x_in_adr)  # frame base adr, fft mem adr will incr. during frame data write
+        b_adr = Signal(len(fft.x_in_adr))  # frame base adr, fft mem adr will incr. during frame data write
         dummy = Signal(fft.width_i * 2)  # empty dummy signal for shift reg
 
         datapos = Signal(int(np.ceil(np.log2(coef_per_frame + 1))))
@@ -44,9 +44,10 @@ class Fft_load(Module):
                datapos.eq(0),
                fft.x_in_we.eq(1),
                ).Elif(datapos != (coef_per_frame - 1),
-                      b_adr.eq(b_adr + 1),
                       datapos.eq(datapos + 1),
                       Cat(data).eq(Cat(data[1:], dummy)),  # shift out data
+                      b_adr.eq(b_adr + 1),
+                      If(reduce(and_, b_adr), fft.x_in_we.eq(0))  # check if adr overflowed and de-assert write enable
                       ).Else(
                 fft.x_in_we.eq(0),
             ),

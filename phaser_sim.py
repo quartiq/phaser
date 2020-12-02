@@ -127,20 +127,27 @@ class Phaser(Module):
                 # yield self.link.checker.frame_stb.eq(1)  # update fft_load reg on first frame
                 # yield
                 # yield self.link.checker.frame_stb.eq(0)
-                yield self.link.checker.frame.eq(1 | 2<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
-                # write some data to first and second coef and de-assert fft_load
+                yield self.link.checker.frame.eq(1 | 2<<16 | 0<<20)
                 yield
-                yield self.link.checker.frame_stb.eq(1)  # second frame contains data
+                yield self.link.checker.frame_stb.eq(1)
                 yield
                 yield self.link.checker.frame_stb.eq(0)
                 yield
                 yield
                 yield
                 yield
-                yield self.link.checker.frame.eq(1 | 55 << 1 | 1 << 8 | 2<<16 | 1<<20 | 2**15<<(20+64) | 2**15<<(20+96))
-                # write some data to first and second coef and de-assert fft_load
+                yield self.link.checker.frame.eq(1 | 2<<16 | 62<<20 | 2**31<<(20+64) | 2**31<<(20+96+32))
                 yield
-                yield self.link.checker.frame_stb.eq(1)  # second frame contains data
+                yield self.link.checker.frame_stb.eq(1)
+                yield
+                yield self.link.checker.frame_stb.eq(0)
+                yield
+                yield
+                yield
+                yield
+                yield self.link.checker.frame.eq(1 | 55 << 1 | 1 << 8)
+                yield
+                yield self.link.checker.frame_stb.eq(1)
                 yield
                 yield self.link.checker.frame_stb.eq(0)
 
