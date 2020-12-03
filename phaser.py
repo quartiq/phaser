@@ -126,7 +126,7 @@ class Phaser(Module):
             ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
             ("repeater", Register(), Register()),  # number fft repeats
             ("fft_start", Register()),  # starts fft computation
-            ("interpolation_rate", Register()),  # set interpolation rate
+            ("interpolation_rate", Register(), Register()),  # set interpolation rate
 
             ("fft_busy", Register()),  # fft core in computation
             ("pulsegen_busy", Register()),  # pulsegen in pulse ejection
@@ -236,49 +236,13 @@ class Phaser(Module):
                     ),
                 ]
 
-            # self.sync += [
-            #     If(cfg[2:4] == 1,  # ducx_cfg_sel
-            #         # i is lsb, q is msb
-            #         # repeat the test data to fill the oserdes
-            #         Cat([d[ch] for d in self.dac.data]).eq(Replicate(
-            #             self.decoder.get("dac{}_test".format(ch), "write"), 2))
-            #     ),
-            # ]
-
-            # stft
             self.sync += [
-                If(cfg[2:4] == 1,  # stft
-
-                    self.dac.data[0][ch].eq(self.decoder.interpolate[0].cic.input.data),
-                    self.dac.data[2][ch].eq(self.decoder.interpolate[0].cic.input.data),
-
-                    self.dac.data[1][ch].eq(self.decoder.interpolate[0].cic.input.data),
-                    self.dac.data[3][ch].eq(self.decoder.interpolate[0].cic.input.data),
-                   )
-            ]
-
-            # DEBUG
-            self.sync += [
-                If(cfg[2:4] == 3,  # debug
-
-                   self.dac.data[0][ch].eq(self.decoder.interpolate[0].input.data),
-                   self.dac.data[2][ch].eq(self.decoder.interpolate[0].input.data),
-
-                   self.dac.data[1][ch].eq(self.decoder.interpolate[0].input.data),
-                   self.dac.data[3][ch].eq(self.decoder.interpolate[0].input.data),
-                   )
-            ]
-
-            # stft
-            self.sync += [
-                If(cfg[2:4] == 2,  # stft
-
-                    self.dac.data[0][ch].eq(pulsegen.inter_i.output.data0),
-                    self.dac.data[2][ch].eq(pulsegen.inter_i.output.data1),
-
-                    self.dac.data[1][ch].eq(pulsegen.inter_q.output.data0),
-                    self.dac.data[3][ch].eq(pulsegen.inter_q.output.data1),
-                   )
+                If(cfg[2:4] == 1,  # ducx_cfg_sel
+                    # i is lsb, q is msb
+                    # repeat the test data to fill the oserdes
+                    Cat([d[ch] for d in self.dac.data]).eq(Replicate(
+                        self.decoder.get("dac{}_test".format(ch), "write"), 2))
+                ),
             ]
 
             self.comb += [
@@ -286,6 +250,16 @@ class Phaser(Module):
                 self.decoder.get("dac{}_data".format(ch), "read").eq(
                     Cat(d[ch] for d in self.dac.data)),
             ]
+        self.sync += [
+            If(cfg[2:4] == 2,  # stft
+
+               self.dac.data[1][0].eq(pulsegen.inter_i.output.data0),
+               self.dac.data[3][0].eq(pulsegen.inter_i.output.data1),
+
+               self.dac.data[1][1].eq(pulsegen.inter_q.output.data0),
+               self.dac.data[3][1].eq(pulsegen.inter_q.output.data1),
+               )
+        ]
 
         # use liberally for debugging
         self.comb += [
@@ -312,6 +286,7 @@ class Phaser(Module):
             Cat([platform.request("user_led", i) for i in range(6)]).eq(Cat(
                 self.pulsegen.loader.test,
                 self.pulsegen.loader.cnt[-1],
+                self.pulsegen.fft.done
             ))
         ]
 

@@ -114,10 +114,8 @@ class Pulsegen(Module):
                           decoder.get("pulsegen_busy", "write").eq(0),
                       ),
                       ),
-            If(decoder.get("fft_start", "read") == 1,
-               fft.start.eq(1)).Else(
-                fft.start.eq(0)
-            ),
+            If(fft.start == 1, fft.start.eq(0), decoder.get("fft_start", "write").eq(0)),
+            If(decoder.get("fft_start", "read") & (~fft.start), fft.start.eq(1)),
             decoder.get("fft_busy", "write").eq(fft.busy),
 
         ]

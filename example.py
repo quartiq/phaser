@@ -26,7 +26,10 @@ class Phaser(EnvExperiment):
     def inner(self):
         f = self.phaser0
 
+
         f.init(debug=True)
+        #f.set_cfg(clk_sel=f.clk_sel)
+        delay(.1 * ms)
 
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
@@ -34,10 +37,7 @@ class Phaser(EnvExperiment):
             f.channel[ch].set_duc_frequency(190.598551*MHz)
             f.channel[ch].set_duc_phase(.25)
             f.channel[ch].set_duc_cfg(select=2, clr=0)
-            f.write8(0x31, 12)
 
-            delay(.02*ms)
-            f.write8(0x30, 1)
             delay(.1*ms)
             for osc in range(5):
                 ftw = (osc + 1)*1.875391*MHz
@@ -53,6 +53,56 @@ class Phaser(EnvExperiment):
                 f.channel[ch].oscillator[osc].set_amplitude_phase(asf, phase=.25, clr=0)
                 delay(.1*ms)
         f.duc_stb()
+        delay_mu(8)
+        a = 64
+        imag = [0 for _ in range(a)]
+        real = [0x2000 for i in range(a)]
+        # real = [0,0,0]
+        # imag = [0,0,0]
+
+        # f.pulsegen.stage_coef_adr(64)
+        # delay_mu(800)
+        # f.pulsegen.stage_coef_data(0, 0x2000, 0)
+        # delay_mu(800)
+        # f.pulsegen.send_frame()
+        # delay_mu(800)
+
+        f.pulsegen.clear_full_coef()
+        delay(1 * ms)
+
+        # f.pulsegen.stage_coef_adr(64)
+        # delay_mu(800)
+        f.pulsegen.send_coef(20, [0x3fff,0xef00,0,0x2000], [0x3fff,0x0100,0,0xd000])
+
+        delay(1 * ms)
+
+        f.pulsegen.set_shiftmask(0xf)
+        delay(1*ms)
+
+        f.pulsegen.set_interpolation_rate(20)
+        delay(1 * ms)
+
+        f.pulsegen.start_fft()
+        delay(1 * ms)
+
+
+        # f.pulsegen.send_full_coef(imag, real)
+        # delay(1 * ms)
+
+        # f.pulsegen.clear_staging_area()
+        # delay_mu(8)
+        # f.pulsegen.stage_coef_adr(0)
+        # delay_mu(5000)
+        # f.pulsegen.send_frame()
+        # delay_mu(8)
+        # f.pulsegen.stage_coef_adr(0)
+        # delay_mu(800)
+        # # f.pulsegen.stage_coef_data(0, 0x7fff, 0)
+        # # delay_mu(800)
+        # f.pulsegen.send_frame()
+        # delay_mu(800)
+
+
 
         for ch in range(2):
             for addr in range(8):
