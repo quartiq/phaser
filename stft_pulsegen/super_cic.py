@@ -79,7 +79,7 @@ class SuperCicUS(Module):
         ]
 
         if gaincompensated:
-            sig, shift = self._tweak_gain(r_reg, r_max, n, self.input.data, width_lut=width_lut)
+            sig, shift = self._tweak_gain(r_reg, r_max, n, self.input.data, f_rst, width_lut=width_lut)
         else:
             sig = self.input.data
 
@@ -94,10 +94,10 @@ class SuperCicUS(Module):
                 If(comb_ce,
                    old.eq(sig),
                    diff.eq(sig - old),
-                   If(f_rst,
-                      old.eq(0),
-                      diff.eq(0)
-                      )
+                   ),
+                If(f_rst,
+                   old.eq(0),
+                   diff.eq(0)
                    )
             ]
 
@@ -159,7 +159,7 @@ class SuperCicUS(Module):
                 self.output.data1.eq(sig_b),
             ]
 
-    def _tweak_gain(self, r, r_max, n, x, width_lut=18):
+    def _tweak_gain(self, r, r_max, n, x, f_rst, width_lut=18):
         """tweaks the DC gain of the cic to be unity for all ratechanges"""
         tweaks = np.arange(r_max)
         tweaks[0] = 1
@@ -176,7 +176,7 @@ class SuperCicUS(Module):
         port = lut.get_port(write_capable=False)
         self.specials += lut, port
         out = Signal((len(x) + n, True), reset_less=True)
-        shift = Signal((bitshift_lut_width, True), reset_less=True)
+        shift = Signal((bitshift_lut_width), reset_less=True)
         temp = Signal((width_lut - bitshift_lut_width + self.width_d, True), reset_less=True)
         tweak = Signal(width_lut - bitshift_lut_width)
         x_reg = Signal.like(x)
@@ -187,6 +187,12 @@ class SuperCicUS(Module):
             temp.eq(tweak * x_reg),
             out.eq(temp >> (width_lut - bitshift_lut_width - 1)),
             # out.eq((port.dat_r[:(width_lut - bitshift_lut_width)] * x) >> (width_lut - bitshift_lut_width - 1)),
-            shift.eq(port.dat_r[(width_lut - bitshift_lut_width):])
+            shift.eq(port.dat_r[(width_lut - bitshift_lut_width):]),
+            If(f_rst,
+               x_reg.eq(0),
+               out.eq(0),
+               temp.eq(0)
+               )
         ]
         return out, shift
+
