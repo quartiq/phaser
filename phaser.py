@@ -226,11 +226,16 @@ class Phaser(Module):
             ]
             for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
                 self.comb += [
-                    ti.i.eq(self.decoder.data[t][ch].i),
-                    ti.q.eq(self.decoder.data[t][ch].q),
+                    If(cfg[2:4] == 2,  # stft pulsegen
+                        ti.i.eq(self.pulsegen.data[t][0]),
+                        ti.q.eq(self.pulsegen.data[t][1]),
+                       ).Else(
+                        ti.i.eq(self.decoder.data[t][ch].i),
+                        ti.q.eq(self.decoder.data[t][ch].q),
+                    ),
                 ]
                 self.sync += [
-                    If(cfg[2:4] == 0,  # ducx_cfg_sel
+                    If((cfg[2:4] == 0) | (cfg[2:4] == 2),  # ducx_cfg_sel
                         self.dac.data[2*t][ch].eq(to.i),
                         self.dac.data[2*t + 1][ch].eq(to.q),
                     ),
@@ -251,7 +256,7 @@ class Phaser(Module):
                     Cat(d[ch] for d in self.dac.data)),
             ]
         self.sync += [
-            If(cfg[2:4] == 2,  # stft
+            If(cfg[2:4] == 3,  # raw stft
 
                self.dac.data[1][0].eq(pulsegen.inter_i.output.data0),
                self.dac.data[3][0].eq(pulsegen.inter_i.output.data1),

@@ -4,6 +4,7 @@
 import numpy as np
 from migen import *
 from misoc.interconnect.stream import Endpoint
+from misoc.cores.duc import complex
 
 from block_fft import Fft
 from super_interpolator import SuperInterpolator
@@ -68,6 +69,8 @@ class Pulsegen(Module):
 
         self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
         self.submodules.inter_q = inter_q = SuperInterpolator(r_max=1024)
+        self.data = [[Signal((width_d, True)) for _ in range(2)]
+                         for _ in range(2)]
 
         pos = Signal(int(np.log2(size_fft)))  # position in fft mem
         p = Signal(16, reset=0)  # number repeats
@@ -78,6 +81,10 @@ class Pulsegen(Module):
             inter_q.input.data.eq(fft.x_out[:width_d]),
             fft.x_out_adr.eq(pos),
             fft.en.eq(1),
+            self.data[0][0].eq(self.inter_i.output.data0),
+            self.data[1][0].eq(self.inter_i.output.data1),
+            self.data[0][1].eq(self.inter_q.output.data0),
+            self.data[1][1].eq(self.inter_q.output.data1),
         ]
 
         self.sync += [
