@@ -4,6 +4,8 @@ from misoc.cores.fir import MACFIR, HBFMACUpsampler
 from misoc.cores.cic import SuperCIC
 from misoc.cores.duc import complex
 
+from mac_hbf_upsampler import MAC_HBF_Upsampler
+from mac_sym_fir import MAC_SYM_FIR
 
 class SampleMux(Module):
     """Zero order hold interpolator.
@@ -69,22 +71,19 @@ class MiniFIFO(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
+        h_fir = [24, -85, 281, -1314, 55856, -1314, 281, -85, 24]
         # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 ~ 0.9, 9 taps
-        # maybe TODO: use symmetry for power
-        self.submodules.ciccomp = MACFIR(9, scale=16)
-        for i, ci in enumerate(
-                [24, -85, 281, -1314, 55856, -1314, 281, -85, 24]):
-            self.ciccomp.coeff.sr[i].reset = ci
-        # hbf1: rate 1/10 -> 1/5, gain=1, 39 taps
-        self.submodules.hbf0 = HBFMACUpsampler(
-            [-167, 0, 428, 0, -931, 0, 1776, 0, -3115, 0, 5185, 0, -8442, 0,
+        self.submodules.ciccomp = MAC_SYM_FIR(h_fir, width_d=24, width_coef=16)
+        h_hbf0 = [-167, 0, 428, 0, -931, 0, 1776, 0, -3115, 0, 5185, 0, -8442, 0,
                 14028, 0, -26142, 0, 82873, 131072, 82873, 0, -26142, 0, 14028,
                 0, -8442, 0, 5185, 0, -3115, 0, 1776, 0, -931, 0, 428, 0,
-                -167])
+                -167]
+        # hbf1: rate 1/10 -> 1/5, gain=1, 39 taps
+        self.submodules.hbf0 = MAC_HBF_Upsampler(h_hbf0, width_d=24, width_coef=17)
+        h_hbf1 = [294, 0, -1865, 0, 6869, 0, -20436, 0, 80679, 131072, 80679, 0,
+                -20436, 0, 6869, 0, -1865, 0, 294]
         # hbf1: rate 1/5 -> 2/5, gain=1, 19 taps
-        self.submodules.hbf1 = HBFMACUpsampler(
-            [294, 0, -1865, 0, 6869, 0, -20436, 0, 80679, 131072, 80679, 0,
-                -20436, 0, 6869, 0, -1865, 0, 294])
+        self.submodules.hbf1 = MAC_HBF_Upsampler(h_hbf1, width_d=24, width_coef=17)
         # cic: rate 2/5 -> 2/1, gain=5**4
         # the CIC doesn't cope with FIR overshoot and baseband data must be
         # band limited and/or backed off. Maybe TODO: clipping
@@ -97,7 +96,7 @@ class InterpolateChannel(Module):
         self.output = Endpoint([("data0", (16, True)), ("data1", (16, True))])
         # align MACs to MSB to save power, keep one bit headroom for FIR
         # overshoot.
-        scale_in = len(self.ciccomp.sample.load.data) - len(self.input.data) - 1
+        scale_in = len(self.ciccomp.input.data) - len(self.input.data) - 1
         scale_out = len(self.hbf1.output.data) - len(self.cic.input.data) - 1
         bias_out = (1 << scale_out - 1) - 1  # round half down bias
         # cic gain is r**(n-1) = 5**4, compensate with 2**-9,
@@ -105,8 +104,8 @@ class InterpolateChannel(Module):
         scale_cic = 9
         bias_cic = (1 << scale_cic - 1) - 1  # round half down bias
         self.comb += [
-            self.input.connect(self.ciccomp.sample.load, omit=["data"]),
-            self.ciccomp.sample.load.data.eq(self.input.data << scale_in),
+            self.input.connect(self.hbf0.input, omit=["data"]),
+            self.ciccomp.input.data.eq(self.input.data << scale_in),
             self.ciccomp.output.connect(self.hbf0.input),
             self.hbf0.output.connect(self.buf0.input),
             self.buf0.output.connect(self.hbf1.input),
@@ -120,3 +119,4 @@ class InterpolateChannel(Module):
             self.output.data1.eq((self.cic.output.data1 + bias_cic) >>
                                  scale_cic),
         ]
+
