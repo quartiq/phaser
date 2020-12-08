@@ -41,7 +41,7 @@ class MAC_SYM_FIR(Module):
         bias = (1 << width_coef - 1) - 1
         coef = []
         for i, c in enumerate(coeff[: (len(coeff) + 1) // 2]):
-            coef.append(Signal((width_coef, True), reset_less=True, reset=c))
+            coef.append(Signal((width_coef + 1, True), reset_less=True, reset=c))
 
         self.input = Endpoint([("data", (width_d, True))])
         self.output = Endpoint([("data", (width_d, True))])
@@ -50,6 +50,7 @@ class MAC_SYM_FIR(Module):
 
         self.stop = Signal()  # filter output stall signal
         pos = Signal(int(np.ceil(np.log2(len(coef)))))
+        pos_neg = Signal(len(pos) + 1)
 
         self.comb += [
             self.stop.eq(self.output.stb & ~self.output.ack)  # filter is sensitive to output and ignores input stb
@@ -58,14 +59,14 @@ class MAC_SYM_FIR(Module):
         a, b, c, d, mux_p, p = self._dsp()
 
         self.comb += [
+            pos_neg.eq((len(coef) * 2) - 2 - pos),  # position from end of input shift reg
             c.eq(bias),
             a.eq(Array(x)[pos]),
-            d.eq(Array(x)[-pos-1]),
+            d.eq(Array(x)[pos_neg]),
             If(pos == len(coef) - 1,
                d.eq(0),  # inject zero sample so center tap is only multiplied once
                ),
             b.eq(Array(coef)[pos]),
-            # neat :)
         ]
 
         self.sync += [
@@ -84,7 +85,7 @@ class MAC_SYM_FIR(Module):
                   mux_p.eq(1),
                   ),
                If(pos == dsp_pipelen - 1,  # new output sample at the end of the dsp pipe
-                  self.output.data.eq(p >> (width_coef-1)),
+                  self.output.data.eq(p >> width_coef),
                   self.output.stb.eq(1),
                   ),
                )
@@ -98,7 +99,6 @@ class MAC_SYM_FIR(Module):
             b = Signal((18, True), reset_less=True)
             c = Signal((36, True), reset_less=True)
             d = Signal((18, True), reset_less=True)
-            mux_p = Signal()  # accumulator mux
             ad = Signal((18, True), reset_less=True)
             m = Signal((36, True), reset_less=True)
             p = Signal((36, True), reset_less=True)
@@ -107,11 +107,11 @@ class MAC_SYM_FIR(Module):
             b = Signal((18, True), reset_less=True)
             c = Signal((48, True), reset_less=True)
             d = Signal((25, True), reset_less=True)
-            mux_p = Signal()  # accumulator mux
             ad = Signal((25, True), reset_less=True)
             m = Signal((48, True), reset_less=True)
             p = Signal((48, True), reset_less=True)
 
+        mux_p = Signal()  # accumulator mux
         a_reg = Signal.like(a)
         d_reg = Signal.like(d)
         b_reg = [Signal.like(b) for _ in range(2)]
