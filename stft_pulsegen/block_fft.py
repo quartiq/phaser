@@ -146,8 +146,11 @@ class Fft(Module):
             xram2a_port2.adr.eq(Mux(self.busy, x2p2_adr, self.x_out_adr[:-1])),
             xram2b_port2.adr.eq(Mux(self.busy, x2p2_adr, self.x_out_adr[:-1])),
             self.x_out.eq(
-                Mux(last_bit_xout_adr_l == 0, xram1_port2.dat_r,  # first half of data is in ram1, second in ram2
-                    Mux(c_x2_mux, xram2a_port2.dat_r, xram2b_port2.dat_r))),  # fetch from last used ram2
+                Mux(last_bit_xout_adr_l == 0,
+                    Cat(xram1_port2.dat_r[:width_o], xram1_port2.dat_r[width_int:]),  # first half of data is in ram1, second in ram2
+                    Mux(c_x2_mux,
+                        Cat(xram2a_port2.dat_r[:width_o], xram2a_port2.dat_r[width_int:]),
+                        Cat(xram2b_port2.dat_r[:width_o], xram2b_port2.dat_r[width_int:]),))),  # fetch from last used ram2
             xram1_port2.we.eq(self.busy & bfl_we),
             xram2a_port2.we.eq(self.busy & (bfl_we & c_x2_mux)),
             xram2b_port2.we.eq(self.busy & (bfl_we & (~c_x2_mux))),
@@ -318,7 +321,8 @@ class Fft(Module):
     def _twiddle_mem_gen(self, w_idx):
         """generates twiddle rom and logic for assembling the twiddles from one quarter circle"""
         pos = np.linspace(0, np.pi / 2, int(self.n / 4), False)
-        self.w_p = self.width_wram - 2  # Fixed point position of twiddles. One bit is sign and one is nonfractional (ie 1 at the 0th twiddle)
+        # Fixed point position of twiddles. One bit is sign and one is nonfractional (ie 1 at the 0th twiddle)
+        self.w_p = self.width_wram - 2
         twiddles = [(int(_.real) | int(_.imag) << self.width_wram) & (1 << self.width_wram * 2) - 1
                     for _ in np.round((1 << (self.width_wram - 2)) * np.exp(-1j * pos))]
         wram = Memory(self.width_wram * 2, int(self.n / 4), init=twiddles, name="twiddle")
