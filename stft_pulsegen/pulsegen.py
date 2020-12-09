@@ -63,9 +63,9 @@ class Pulsegen(Module):
     width_d:
     """
 
-    def __init__(self, decoder, width_d=16, size_fft=64):
+    def __init__(self, decoder, width_d=16, size_fft=1024):
         coef_per_frame=12
-        self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=width_d, width_wram=width_d)
+        self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=18, width_wram=18)
         self.submodules.loader = loader = Fft_load(decoder, fft, coef_per_frame)
 
         self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
