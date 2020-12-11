@@ -122,7 +122,7 @@ class Phaser(Module):
             # STFT regs
             ("pulse_trigger", Register()),  # triggers immediate pulse emission
             ("pulse_settings", Register()),  # general pulse settings like immediate pulse emission
-            ("fft_size", Register()),  # (virtually) sets the fft size
+            ("reserved", Register()),
             ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
             ("repeater", Register(), Register()),  # number fft repeats
             ("fft_start", Register()),  # starts fft computation
@@ -201,35 +201,33 @@ class Phaser(Module):
             self.dac.data_sync.eq(self.decoder.stb),
             self.dac.sync_dly.eq(self.decoder.get("sync_dly", "write")),
         ]
+        
+
+        self.submodules.duc = [PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10) for _ in range(2)]
 
         # stft pulsegen
-        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder)
+        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder, self.duc)
 
 
         for ch in range(2):
-            duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
-            self.submodules += duc
             cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
             self.sync += [
                 # keep accu cleared
-                duc.clr.eq(cfg[0]),
+                self.duc[ch].clr.eq(cfg[0]),
                 If(self.decoder.registers["duc_stb"][0].bus.we,
                     # clear accu once
                     If(cfg[1],
-                        duc.clr.eq(1),
+                        self.duc[ch].clr.eq(1),
                     ),
-                    duc.f.eq(self.decoder.get("duc{}_f".format(ch), "write")),
-                    # msb align to 19 bit duc.p
-                    duc.p[3:].eq(
+                    self.duc[ch].f.eq(self.decoder.get("duc{}_f".format(ch), "write")),
+                    # msb align to 19 bit self.duc[ch].p
+                    self.duc[ch].p[3:].eq(
                         self.decoder.get("duc{}_p".format(ch), "write")),
                 ),
             ]
-            for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
+            for t, (ti, to) in enumerate(zip(self.duc[ch].i, self.duc[ch].o)):
                 self.comb += [
-                    If(cfg[2:4] == 2,  # stft pulsegen
-                        ti.i.eq(self.pulsegen.data[t][0]),
-                        ti.q.eq(self.pulsegen.data[t][1]),
-                       ).Else(
+                    If(cfg[2:4] == 0,
                         ti.i.eq(self.decoder.data[t][ch].i),
                         ti.q.eq(self.decoder.data[t][ch].q),
                     ),
@@ -258,11 +256,11 @@ class Phaser(Module):
         self.sync += [
             If(cfg[2:4] == 3,  # raw stft
 
-               self.dac.data[1][0].eq(pulsegen.inter_i.output.data0),
-               self.dac.data[3][0].eq(pulsegen.inter_i.output.data1),
+               self.dac.data[1][0].eq(pulsegen.branch[0].inter_i.output.data0),
+               self.dac.data[3][0].eq(pulsegen.branch[0].inter_i.output.data1),
 
-               self.dac.data[1][1].eq(pulsegen.inter_q.output.data0),
-               self.dac.data[3][1].eq(pulsegen.inter_q.output.data1),
+               self.dac.data[1][1].eq(pulsegen.branch[1].inter_q.output.data0),
+               self.dac.data[3][1].eq(pulsegen.branch[1].inter_q.output.data1),
                )
         ]
 
@@ -288,11 +286,6 @@ class Phaser(Module):
                 self.dac.istr,
                 dac_ctrl.alarm,
             )),
-            Cat([platform.request("user_led", i) for i in range(6)]).eq(Cat(
-                self.pulsegen.loader.test,
-                self.pulsegen.loader.cnt[-1],
-                self.pulsegen.fft.done
-            ))
         ]
 
 
