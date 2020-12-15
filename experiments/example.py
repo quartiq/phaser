@@ -7,8 +7,6 @@ class Phaser(EnvExperiment):
     def build(self):
         self.setattr_device("core")
         self.setattr_device("phaser0")
-        self.setattr_device("ttl0")
-        self.setattr_device("ttl1")
 
     @rpc(flags={"async"})
     def p(self, *p):
@@ -19,7 +17,7 @@ class Phaser(EnvExperiment):
 
     @kernel
     def do(self):
-        #self.core.reset()
+        # self.core.reset()
         self.core.break_realtime()
         for i in range(1):
             self.inner()
@@ -27,8 +25,6 @@ class Phaser(EnvExperiment):
     @kernel
     def inner(self):
         f = self.phaser0
-        ttl0 = self.ttl0
-        ttl1 = self.ttl1
 
 
         f.init(debug=True)
@@ -38,9 +34,9 @@ class Phaser(EnvExperiment):
         for ch in range(2):
             f.channel[ch].set_att(0*dB)
             # f.channel[ch].set_duc_frequency_mu(0)
-            f.channel[ch].set_duc_frequency(200*MHz)
+            f.channel[ch].set_duc_frequency(100*MHz)
             f.channel[ch].set_duc_phase(.25)
-            f.channel[ch].set_duc_cfg(select=3, clr=0)
+            f.channel[ch].set_duc_cfg(select=2, clr=0)
 
             delay(.1*ms)
             for osc in range(5):
@@ -56,33 +52,73 @@ class Phaser(EnvExperiment):
                 delay(.1*ms)
                 f.channel[ch].oscillator[osc].set_amplitude_phase(asf, phase=.25, clr=0)
                 delay(.1*ms)
-
-
         f.duc_stb()
+        delay_mu(8)
+        a = 64
+        imag = [0 for _ in range(a)]
+        real = [i*0x100 for i in range(a)]
+        # real = [0,0,0]
+        # imag = [0,0,0]
+
+        # f.pulsegen.stage_coef_adr(64)
+        # delay_mu(800)
+        # f.pulsegen.stage_coef_data(0, 0x2000, 0)
+        # delay_mu(800)
+        # f.pulsegen.send_frame()
+        # delay_mu(800)
+
         f.pulsegen.clear_full_coef()
         delay(1 * ms)
-        delay_mu(8)
-        a=32
-        real = [0x3000 for i in range(a)]
-        f.pulsegen.set_pulsesettings(1)
-        f.pulsegen.set_nr_repeats(10)
-        delay(0.1*ms)
-        f.pulsegen.send_full_coef(real, real)
-        delay(.01 * ms)
-        f.pulsegen.get_frame_timestamp()
-        at_mu(int64(f.pulsegen.frame_tstamp+0xffffff))
-        delay_mu(int64(f.pulsegen.tframe)*20)
-        t = now_mu()
-        loopdelay = 200 * f.pulsegen.tframe
-        for i in range(10000000):
-            at_mu(t)
-            t = t+loopdelay
-            ttl0.pulse(1*us)
-            f.pulsegen.trigger()
 
+        f.pulsegen.set_interpolation_rate(8)
+        delay(1 * ms)
 
+        # f.pulsegen.stage_coef_adr(64)
+        # delay_mu(800)
+        # f.pulsegen.send_coef(20, [0x3fff,0xef00,0,0x2000], [0x3fff,0x0100,0,0xd000])
+        #f.pulsegen.send_coef(61, [0x2000,0x2000,0x2000,0x2000], [0x000,0x000,0x000,0x000])
+        delay(.1 * ms)
 
+        f.pulsegen.send_full_coef(real, imag)
+        delay(.1 * ms)
+
+        f.pulsegen.set_shiftmask(0x00)
         delay(1*ms)
+
+        #f.pulsegen.send_coef(0, [0x0,0x0,0,0x0000, 0x0000], [0x0,0x0000,0,0x0000, 0])
+
+
+
+        f.pulsegen.start_fft()
+        # delay(1000 * ms)
+        # f.pulsegen.set_interpolation_rate(500)
+        delay(1 * ms)
+
+
+        # r=2
+        # for i in range(50):
+        #     f.pulsegen.set_interpolation_rate(r)
+        #     r=(r+100)%500
+        #     delay(500 * ms)
+
+
+        # f.pulsegen.send_full_coef(imag, real)
+        # delay(1 * ms)
+
+        # f.pulsegen.clear_staging_area()
+        # delay_mu(8)
+        # f.pulsegen.stage_coef_adr(0)
+        # delay_mu(5000)
+        # f.pulsegen.send_frame()
+        # delay_mu(8)
+        # f.pulsegen.stage_coef_adr(0)
+        # delay_mu(800)
+        # # f.pulsegen.stage_coef_data(0, 0x7fff, 0)
+        # # delay_mu(800)
+        # f.pulsegen.send_frame()
+        # delay_mu(800)
+
+
 
         for ch in range(2):
             for addr in range(8):
