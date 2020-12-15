@@ -104,10 +104,8 @@ class SuperInterpolator(Module):
 
         if dsp_arch == "lattice":
             y = [Signal((36, True), reset_less=True) for _ in range(nr_dsps)]
-            y_reg = [Signal((36, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
         else:  # xilinx dsp arch
             y = [Signal((48, True), reset_less=True) for _ in range(nr_dsps)]
-            y_reg = [Signal((48, True), reset_less=True) for _ in range(((nr_dsps - 1) // 2) + 1)]
 
         # last stage: supersampled CIC interpolator
         self.submodules.cic = SuperCicUS(width_d=width_d, n=6, r_max=r_max // 4, gaincompensated=True, width_lut=18)
@@ -184,11 +182,6 @@ class SuperInterpolator(Module):
                             b.eq(coef_a[(i * 2) + 1]),
                         )
                     )
-                ]
-                self.sync += [
-                    If(hbf0_step1 & ~self.hbfstop,
-                       y_reg[i].eq(p)
-                       )
                 ]
                 if i >= 1:
                     self.comb += [
