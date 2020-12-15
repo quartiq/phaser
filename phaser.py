@@ -122,7 +122,7 @@ class Phaser(Module):
             # STFT regs
             ("pulse_trigger", Register()),  # triggers immediate pulse emission
             ("pulse_settings", Register()),  # general pulse settings like immediate pulse emission
-            ("reserved", Register()),
+            ("stft_reserved", Register()),
             ("fft_shiftmask", Register(), Register()),  # fft stage shifting schedule
             ("repeater", Register(), Register()),  # number fft repeats
             ("fft_start", Register()),  # starts fft computation
@@ -205,8 +205,10 @@ class Phaser(Module):
 
         self.submodules.duc = [PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10) for _ in range(2)]
 
-        # stft pulsegen
-        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder, self.duc)
+        # stft pulsegen (only pass DUC of first channel)
+        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder, [self.duc[0]])
+
+        cnt=Signal(27)
 
 
         for ch in range(2):
@@ -227,16 +229,16 @@ class Phaser(Module):
             ]
             for t, (ti, to) in enumerate(zip(self.duc[ch].i, self.duc[ch].o)):
                 self.comb += [
-                    If(cfg[2:4] == 0,
-                        ti.i.eq(self.decoder.data[t][ch].i),
-                        ti.q.eq(self.decoder.data[t][ch].q),
-                    ),
+                    # If(cfg[2:4] == 0,
+                    #     ti.i.eq(self.decoder.data[t][ch].i),
+                    #     ti.q.eq(self.decoder.data[t][ch].q),
+                    # ),
                 ]
                 self.sync += [
-                    If((cfg[2:4] == 0) | (cfg[2:4] == 2),  # ducx_cfg_sel
-                        self.dac.data[2*t][ch].eq(to.i),
-                        self.dac.data[2*t + 1][ch].eq(to.q),
-                    ),
+                    # If(cfg[2:4] == 0,  # ducx_cfg_sel
+                    #     self.dac.data[2*t][ch].eq(to.i),
+                    #     self.dac.data[2*t + 1][ch].eq(to.q),
+                    # ),
                 ]
 
             self.sync += [
@@ -253,15 +255,65 @@ class Phaser(Module):
                 self.decoder.get("dac{}_data".format(ch), "read").eq(
                     Cat(d[ch] for d in self.dac.data)),
             ]
+
         self.sync += [
+            If(cfg[2:4] == 2,  # raw stft
+
+               self.dac.data[1][0].eq(pulsegen.mult[0].p.i),
+               self.dac.data[3][0].eq(pulsegen.mult[1].p.i),
+
+               self.dac.data[1][1].eq(pulsegen.mult[0].p.i),
+               self.dac.data[3][1].eq(pulsegen.mult[1].p.i),
+
+               cnt.eq(cnt + 1),
+
+               # self.dac.data[1][1].eq(pulsegen.branch[0].inter_q.output.data0),
+               # self.dac.data[3][1].eq(pulsegen.branch[0].inter_q.output.data1),
+               ),
+            # If(cfg[2:4] == 1,
+            #
+            #    self.dac.data[1][0].eq(self.duc[0].o[0].i),
+            #    self.dac.data[3][0].eq(self.duc[0].o[1].i),
+            #
+            #    self.dac.data[1][1].eq(self.duc[0].o[0].i),
+            #    self.dac.data[3][1].eq(self.duc[0].o[1].i),
+            #    ),
+
+            If(cfg[2:4] == 0,  # raw stft
+
+               # self.dac.data[1][0].eq(pulsegen.branch[1].inter_i.output.data0),
+               # self.dac.data[3][0].eq(pulsegen.branch[1].inter_i.output.data1),
+               #
+               # self.dac.data[1][1].eq(pulsegen.branch[1].inter_q.output.data0),
+               # self.dac.data[3][1].eq(pulsegen.branch[1].inter_q.output.data1),
+
+               self.dac.data[1][0].eq(pulsegen.test[0]),
+               self.dac.data[3][0].eq(pulsegen.test[1]),
+
+               self.dac.data[1][1].eq(pulsegen.test[0]),
+               self.dac.data[3][1].eq(pulsegen.test[1]),
+               cnt.eq(cnt+4),
+               ),
+
             If(cfg[2:4] == 3,  # raw stft
 
-               self.dac.data[1][0].eq(pulsegen.branch[0].inter_i.output.data0),
-               self.dac.data[3][0].eq(pulsegen.branch[0].inter_i.output.data1),
+               self.dac.data[1][0].eq(pulsegen.sum[-1][0].i),
+               self.dac.data[3][0].eq(pulsegen.sum[-1][1].i),
 
-               self.dac.data[1][1].eq(pulsegen.branch[1].inter_q.output.data0),
-               self.dac.data[3][1].eq(pulsegen.branch[1].inter_q.output.data1),
-               )
+               self.dac.data[1][1].eq(pulsegen.sum[-1][0].i),
+               self.dac.data[3][1].eq(pulsegen.sum[-1][1].i),
+               # self.dac.data[1][0].eq(cnt),
+               # self.dac.data[3][0].eq(cnt),
+               #
+               # self.dac.data[1][1].eq(cnt),
+               # self.dac.data[3][1].eq(cnt),
+               cnt.eq(cnt+2),
+
+               # self.dac.data[1][1].eq(pulsegen.branch[0].inter_q.output.data0),
+               # self.dac.data[3][1].eq(pulsegen.branch[0].inter_q.output.data1),
+               ),
+
+
         ]
 
         # use liberally for debugging
@@ -286,6 +338,10 @@ class Phaser(Module):
                 self.dac.istr,
                 dac_ctrl.alarm,
             )),
+            Cat([platform.request("user_led", i) for i in range(6)]).eq(Cat(
+                self.pulsegen.cnt[-1],
+                cnt[-1]
+            ))
         ]
 
 
