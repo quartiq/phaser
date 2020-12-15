@@ -59,14 +59,14 @@ class TestInterpolator(unittest.TestCase):
     def calc_delay(self, r):
         assert (r % 4 == 0) | (r == 2), "unsupported rate"
         if r == 2:
-            return 18 + 20 + 2
+            return 18 + 20 + 2 + 2 + 28
         if r == 4:
-            return 18 + 20 + 50 + 6
+            return 18 + 20 + 50 + 6 + 2 + 12
         if r == 20:
-            if (r//4) % 2:
-                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 7 + 5
+            if (r // 4) % 2:
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 7 + 5 + 2 + 60
             else:
-                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 1 + 7 + 5
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 1 + 7 + 5 + 2 + 60
         else:
             ValueError
 
@@ -150,7 +150,7 @@ class TestInterpolator(unittest.TestCase):
     def test_hbf0(self):
         """test for r=2, only hbf0 engaged"""
         r = 2
-
+        #self.x = [2**14]+[0]*1000
         y_model = self.interpolator_model(self.x, r)
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
@@ -160,6 +160,7 @@ class TestInterpolator(unittest.TestCase):
     def test_hbf01(self):
         """test for r=4, hbf0 and hbf1 used"""
         r = 4
+        #self.x = [2 ** 14] + [0] * 1000
         y_model = self.interpolator_model(self.x, r)
         y_sim = self.run_sim(self.x, r)
         delay = self.calc_delay(r)
