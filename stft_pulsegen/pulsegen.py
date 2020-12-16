@@ -232,31 +232,10 @@ class Pulsegen(Module):
                            for _ in range(2)] for _ in range(len(branch) + 1)]
         self.output = [Record(complex(width_d), reset_less=True, name="output") for _ in range(2)]
 
-        self.test = test = [Signal((width_d, True)) for _ in range(2)]
-        self.cnt =Signal(27)
-
         # signal flow
-
-        # add up all upconverted STFT branches
-        # [(s.i.eq(reduce(add, [_.o[n].i for _ in duc])), (s.q.eq(reduce(add, [_.o[n].q for _ in duc]))))\
-        #                                              for n, s in enumerate(sum)],
-        # if len(branch) > 1:
-        #     self.sync += [
-        #         [(s.i.eq(duc[0].o[n].i + duc[1].o[n].i), s.q.eq(duc[0].o[n].q + duc[1].o[n].q)) \
-        #          for n, s in enumerate(sum[0])],
-        #     ]
-        # else:
-        #     self.sync += [
-        #         [(s.i.eq(duc[0].o[n].i), s.q.eq(duc[0].o[n].q)) for n, s in enumerate(sum[0])],
-        #     ]
-
-        # if len(branch) > 0:
         self.sync += [
             [[(s.i.eq(sum[m - 1][n].i + duc[m - 1].o[n].i), (s.q.eq(sum[m - 1][n].q + duc[m - 1].o[n].q))) \
               for n, s in enumerate(k)] for m, k in enumerate(sum) if m >= 1],
-            self.test[0].eq(duc[0].o[0].i + 0),
-            self.test[1].eq(duc[0].o[1].i + 0),
-            self.cnt.eq(self.cnt+1),
         ]
 
         self.sync += [
@@ -265,7 +244,7 @@ class Pulsegen(Module):
             mult[0].a.eq(shaper.inter.output.data0),
             mult[1].b.eq(sum[-1][1]),
             mult[1].a.eq(shaper.inter.output.data1),
-            If((decoder.get("pulse_settings", "read") & 0x04) == 0x04,  # if shaper enabled
+            If((decoder.get("pulse_settings", "read") & 0x04) != 0x04,  # if shaper enabled
                [o.eq(m.p) for o, m in zip(self.output, mult)]
                ).Else(
                 [o.eq(s) for o,s in zip(self.output, sum[-1])]

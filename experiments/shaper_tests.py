@@ -65,7 +65,7 @@ class Phaser(EnvExperiment):
 
         f.duc_stb()
         delay(.1*ms)
-        f.pulsegen.set_pulsesettings(0)
+        f.pulsegen.set_pulsesettings(1<<2)
         delay(.1*ms)
         imag = [0 for _ in range(1024)]
         real = [0 for _ in range(1024)]
@@ -103,11 +103,11 @@ class Phaser(EnvExperiment):
         delay(.1 * ms)
 
 
-        # f.pulsegen.send_full_coef(3, real, imag)
-        # delay(.1 * ms)
+        f.pulsegen.send_full_coef(3, real, imag)
+        delay(.1 * ms)
         # f.pulsegen.send_full_coef(0, real, imag)
         # delay(.1 * ms)
-        f.pulsegen.send_coef(0, 0, [0x0], [0x10000])
+        f.pulsegen.send_coef(0, 10, [0x8000], [0x0])
         delay(.1 * ms)
         # f.pulsegen.send_coef(2, 8, [0x4000, 0x2000], [0x4000, 0x2000])
         # delay(.1 * ms)
