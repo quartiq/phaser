@@ -149,12 +149,12 @@ class SuperCicUS(Module):
             sig_a, sig_b = sum_a, sum_b
 
         if gaincompensated:
-            self.comb += [
+            self.sync += [
                 self.output.data0.eq(sig_a >> shift),
                 self.output.data1.eq(sig_b >> shift),
             ]
         else:
-            self.comb += [
+            self.sync += [
                 self.output.data0.eq(sig_a),
                 self.output.data1.eq(sig_b),
             ]

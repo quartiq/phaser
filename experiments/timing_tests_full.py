@@ -30,22 +30,42 @@ class Phaser(EnvExperiment):
         ttl0 = self.ttl0
         ttl1 = self.ttl1
 
+        f.init(debug=True)
+        delay(.1 * ms)
 
-        for ch in range(2):
+        for ch in range(1):
             f.channel[ch].set_att(0 * dB)
             # f.channel[ch].set_duc_frequency_mu(0)
-            f.channel[ch].set_duc_frequency(100 * MHz)
+            f.channel[ch].set_duc_frequency(190.598551 * MHz)
             f.channel[ch].set_duc_phase(.25)
-            f.channel[ch].set_duc_cfg(select=2, clr=0)
+            f.channel[ch].set_duc_cfg(select=0, clr=0)
             delay(.1 * ms)
+            for osc in range(5):
+                ftw = (osc + 1) * 1.875391 * MHz
+                asf = (osc + 1) * .066
+                # if osc != 4:
+                #    asf = 0.
+                # else:
+                #    asf = .9
+                #    ftw = 9.5*MHz
+                # f.channel[ch].oscillator[osc].set_frequency_mu(0)
+                f.channel[ch].oscillator[osc].set_frequency(ftw)
+                delay(.1 * ms)
+                f.channel[ch].oscillator[osc].set_amplitude_phase(asf, phase=.25, clr=0)
+                delay(.1 * ms)
         f.duc_stb()
         delay(.1 * ms)
 
         f.set_stft_enable_flag(1)
 
         f.pulsegen.set_pulsesettings(disable_shaper=0, gated_output=1)
-        f.pulsegen.set_nr_repeats(1)
+        f.pulsegen.set_nr_repeats(3)
         delay(.1 * ms)
+
+        print(f.read8(0x36))
+
+        delay(100*ms)
+
         imag = [0 for _ in range(1024)]
 
         real = [0 for i in range(1024)]
@@ -54,7 +74,7 @@ class Phaser(EnvExperiment):
         # real[0] = 32000
         # real[100] = 16000
 
-        for i in range(3):  # branches + shaper
+        for i in range(3):  # branches
             f.pulsegen.clear_full_coef(i)
             delay(.1 * ms)
             f.pulsegen.set_interpolation_rate(i, 2 + i * 4)  # + i*4)
@@ -66,17 +86,17 @@ class Phaser(EnvExperiment):
             f.pulsegen.start_fft(i)
             delay(.1 * ms)
             if i <= 2:  # if branch
-                f.pulsegen.set_duc_frequency(i, (i * 50 + 50) * MHz)
+                f.pulsegen.set_duc_frequency(i, (i*50 + 50) * MHz)
 
-                f.pulsegen.set_duc_cfg(i, clr=0)
+                f.pulsegen.set_duc_cfg(i, clr=0, clr_once=1)
                 delay(.1 * ms)
         f.duc_stb()
         delay(.1 * ms)
 
         real = [0 for i in range(1024)]
-        real[-1] = 16000
+        real[-1] = -16000
         real[0] = 32000
-        real[1] = 16000
+        real[1] = -16000
 
         f.pulsegen.clear_full_coef(3)
         delay(.1 * ms)
@@ -90,7 +110,7 @@ class Phaser(EnvExperiment):
         delay(.1 * ms)
 
         f.pulsegen.get_frame_timestamp()
-        at_mu(int64(f.pulsegen.frame_tstamp + 0xffffff))
+        at_mu(int64(f.pulsegen.frame_tstamp + 0xfffff))
         delay_mu(int64(f.pulsegen.tframe) * 20)
         t = now_mu()
         loopdelay = 200000 * f.pulsegen.tframe

@@ -66,8 +66,8 @@ class STFT_Branch(Module):
         self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=18,
                                         width_wram=18)
 
-        self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
-        self.submodules.inter_q = inter_q = SuperInterpolator(r_max=1024)
+        self.submodules.inter_i = inter_i = SuperInterpolator(r_max=512)
+        self.submodules.inter_q = inter_q = SuperInterpolator(r_max=512)
 
         cfg = decoder.get("stft_duc{}_cfg".format(nr), "write")
         self.sync += [
@@ -91,9 +91,9 @@ class STFT_Branch(Module):
         p = Signal(16, reset=0)  # number repeats
         pdone = Signal(reset=1)  # pulse done signal
 
-        if nr <= 1:
+        if nr < 2:  # if duc from phaser classic
             self.comb += [
-                If(decoder.get("stft_en", "write") == 1,
+                If(decoder.get("stft_en", "write") != 0,
                    duc.i[0].i.eq(self.inter_i.output.data0),
                    duc.i[0].q.eq(self.inter_q.output.data0),
                    duc.i[1].i.eq(self.inter_i.output.data1),
@@ -108,7 +108,6 @@ class STFT_Branch(Module):
                duc.i[1].q.eq(self.inter_q.output.data1),
             ]
 
-
         self.comb += [
             inter_i.input.data.eq(fft.x_out[:width_d]),
             inter_q.input.data.eq(fft.x_out[width_d:]),
@@ -121,36 +120,9 @@ class STFT_Branch(Module):
             inter_i.r.eq(decoder.get("interpolation_rate{}".format(nr), "read")),
             inter_q.r.eq(decoder.get("interpolation_rate{}".format(nr), "read")),
             fft.scaling.eq(decoder.get("fft{}_shiftmask".format(nr), "read")),
-            If((decoder.get("pulse_settings", "read") & 0x01) == 0,  # continous fft outpout
-               If(inter_i.input.ack,
-                  pos.eq(pos + 1),
-                  ),
-               ),
-               #.Elif(((decoder.get("pulse_settings", "read") & 0x01) == 1) & ~fft.busy,
-               #        # standard pulse mode with p repeats
-               #        If((decoder.get("pulse_trigger", "read") == 1) & (pdone == 1),
-               #           p.eq(decoder.get("repeater", "read")),
-               #           decoder.get("pulsegen_busy", "write").eq(1),
-               #           decoder.get("pulse_trigger", "write").eq(0),  # de-assert trigger
-               #           pdone.eq(0),
-               #           pos.eq(0),
-               #           ).Elif(pdone == 0,
-               #                  If(inter_i.input.ack,
-               #                     pos.eq(pos + 1),
-               #                     ),
-               #                  If(reduce(and_, pos),
-               #                     p.eq(p - 1)),
-               #                  If(p == 0,
-               #                     pdone.eq(1),
-               #                     pos.eq(0),
-               #                     decoder.get("pulsegen_busy", "write").eq(0),
-               #                     ),
-               #                  ).Else(
-               #            pdone.eq(1),
-               #            pos.eq(0),
-               #            decoder.get("pulsegen_busy", "write").eq(0),
-               #        ),
-               #        ),
+            If(inter_i.input.ack,
+               pos.eq(pos + 1),
+            ),
             If(fft.start == 1, fft.start.eq(0), decoder.get("fft{}_start".format(nr), "write").eq(0)),
             If(decoder.get("fft{}_start".format(nr), "read") & (~fft.start), fft.start.eq(1)),
             decoder.get("fft_busy", "write").eq(fft.busy),
@@ -166,7 +138,7 @@ class Shaper(Module):
         self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=18,
                                         width_wram=18)
 
-        self.submodules.inter = inter = SuperInterpolator(r_max=4096)
+        self.submodules.inter = inter = SuperInterpolator(r_max=2**10)
 
         pos = Signal(int(np.log2(size_fft)))  # position in fft mem
         p = Signal(16, reset=0)  # number repeats
@@ -187,31 +159,31 @@ class Shaper(Module):
                If(inter.input.ack,
                   pos.eq(pos + 1),
                   ),
-               ).Elif(((decoder.get("pulse_settings", "read") & 0x01) == 1) & ~fft.busy,
-                      # standard pulse mode with p repeats
-                      If((decoder.get("pulse_trigger", "read") == 1) & (pdone == 1),
-                         p.eq(decoder.get("repeater", "read")),
-                         decoder.get("pulsegen_busy", "write").eq(1),
-                         decoder.get("pulse_trigger", "write").eq(0),  # de-assert trigger
-                         pdone.eq(0),
-                         pos.eq(0),
-                         ).Elif(pdone == 0,
-                                If(inter.input.ack,
-                                   pos.eq(pos + 1),
-                                   ),
-                                If(reduce(and_, pos),
-                                   p.eq(p - 1)),
-                                If(p == 0,
-                                   pdone.eq(1),
-                                   pos.eq(0),
-                                   decoder.get("pulsegen_busy", "write").eq(0),
-                                   ),
-                                ).Else(
-                          pdone.eq(1),
-                          pos.eq(0),
-                          decoder.get("pulsegen_busy", "write").eq(0),
-                      ),
-                      ),
+           ).Elif(((decoder.get("pulse_settings", "read") & 0x01) == 1) & ~fft.busy,
+                  # standard pulse mode with p repeats
+                  If((decoder.get("pulse_trigger", "read") == 1) & (pdone == 1),
+                     p.eq(decoder.get("repeater", "read")),
+                     decoder.get("pulsegen_busy", "write").eq(1),
+                     decoder.get("pulse_trigger", "write").eq(0),  # de-assert trigger
+                     pdone.eq(0),
+                     pos.eq(0),
+                 ).Elif(pdone == 0,
+                        If(inter.input.ack,
+                           pos.eq(pos + 1),
+                           If(reduce(and_, pos),
+                              p.eq(p - 1)),
+                           ),
+                        If(p == 0,
+                           pdone.eq(1),
+                           pos.eq(0),
+                           decoder.get("pulsegen_busy", "write").eq(0),
+                           ),
+                    ).Else(
+                            pdone.eq(1),
+                            pos.eq(0),
+                            decoder.get("pulsegen_busy", "write").eq(0),
+              ),
+                  ),
             If(fft.start == 1, fft.start.eq(0), decoder.get("fft_shaper_start", "write").eq(0)),
             If(decoder.get("fft_shaper_start", "read") & (~fft.start), fft.start.eq(1)),
             decoder.get("fft_busy", "write").eq(fft.busy),
@@ -237,13 +209,12 @@ class Pulsegen(Module):
 
         self.submodules.branch = branch = [STFT_Branch(i, decoder, duc[i], width_d, size_fft) for i in range(nr_branches)]
 
-        self.submodules.shaper = shaper = Shaper(decoder, width_d, size_fft)
+        self.submodules.shaper = Shaper(decoder, width_d, size_fft)
 
-        self.submodules.loader = Fft_Loader(decoder, [b.fft for b in branch] + [shaper.fft], coef_per_frame)
+        self.submodules.loader = Fft_Loader(decoder, [b.fft for b in branch] + [self.shaper.fft], coef_per_frame)
 
         self.submodules.mult = mult = [RealComplexMultiplier(width_d, width_d, width_d) for _ in range(2)]
 
-        #  sum (supersampled)
         self.sum = sum = [[Record(complex(width_d), reset_less=True, name="sum") \
                            for _ in range(2)] for _ in range(len(branch) + 1)]
         self.output = [Record(complex(width_d), reset_less=True, name="output") for _ in range(2)]
@@ -252,14 +223,11 @@ class Pulsegen(Module):
         self.sync += [
             [[(s.i.eq(sum[m - 1][n].i + duc[m - 1].o[n].i), (s.q.eq(sum[m - 1][n].q + duc[m - 1].o[n].q))) \
               for n, s in enumerate(k)] for m, k in enumerate(sum) if m >= 1],
-        ]
-
-        self.sync += [
             # multiply with shaper output
             mult[0].b.eq(sum[-1][0]),
-            mult[0].a.eq(shaper.inter.output.data0),
+            mult[0].a.eq(self.shaper.inter.output.data0),
             mult[1].b.eq(sum[-1][1]),
-            mult[1].a.eq(shaper.inter.output.data1),
+            mult[1].a.eq(self.shaper.inter.output.data1),
             If((decoder.get("pulse_settings", "read") & 0x04) != 0x04,  # if shaper enabled
                [o.eq(m.p) for o, m in zip(self.output, mult)]
                ).Else(

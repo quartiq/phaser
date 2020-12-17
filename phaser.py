@@ -231,12 +231,11 @@ class Phaser(Module):
             self.dac.data_sync.eq(self.decoder.stb),
             self.dac.sync_dly.eq(self.decoder.get("sync_dly", "write")),
         ]
-        
 
         self.submodules.duc = [PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10) for _ in range(2)]
 
         # stft pulsegen (only pass DUC of first channel)
-        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder, self.duc)
+        self.submodules.pulsegen = pulsegen = Pulsegen(self.decoder, [])
 
         for ch in range(2):
             cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
@@ -288,10 +287,16 @@ class Phaser(Module):
 
                self.dac.data[1][0].eq(pulsegen.output[0].i),
                self.dac.data[3][0].eq(pulsegen.output[1].i),
+               self.dac.data[0][0].eq(pulsegen.output[0].q),
+               self.dac.data[2][0].eq(pulsegen.output[1].q),
 
-               self.dac.data[1][1].eq(pulsegen.output[0].i),
-               self.dac.data[3][1].eq(pulsegen.output[1].i),
-               )
+               # self.dac.data[1][1].eq(self.duc[0].o[0].i),
+               # self.dac.data[3][1].eq(self.duc[0].o[1].i),
+               # self.dac.data[0][1].eq(self.duc[0].o[0].q),
+               # self.dac.data[2][1].eq(self.duc[0].o[1].q),
+               ),
+
+
         ]
 
         # use liberally for debugging
@@ -316,9 +321,6 @@ class Phaser(Module):
                 self.dac.istr,
                 dac_ctrl.alarm,
             )),
-            # Cat([platform.request("user_led", i) for i in range(6)]).eq(Cat(
-            #     cnt[-1]
-            # ))
         ]
 
 
