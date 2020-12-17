@@ -128,9 +128,9 @@ class Fft(Module):
             xram1_port1.adr.eq(Mux(self.busy, x1p1_adr, inp_ram_adr[1:])),
             xram2a_port1.adr.eq(Mux(self.busy, x2p1_adr, inp_ram_adr[1:])),
             xram2b_port1.adr.eq(Mux(self.busy, x2p1_adr, inp_ram_adr[1:])),
-            xram1_port1.dat_w.eq(self.x_in),
-            xram2a_port1.dat_w.eq(self.x_in),
-            xram2b_port1.dat_w.eq(self.x_in),
+            xram1_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
+            xram2a_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
+            xram2b_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
             xram1_port1.we.eq(~self.busy & self.x_in_we & ~inp_ram_adr[0]),
             # use LSB of address to switch between rams when loading data
             xram2a_port1.we.eq(~self.busy & self.x_in_we & inp_ram_adr[0]),
