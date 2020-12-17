@@ -123,14 +123,18 @@ class Fft(Module):
 
         inp_ram_adr = Signal(self.log2n)  # physical ram adress
         last_bit_xout_adr_l = Signal()  # one clock delayed for correct output routing after ram access
+        sign_bits_i = Signal(width_int-width_i)
+        sign_bits_r = Signal(width_int-width_i)
 
         self.comb += [  # fetching/loading ports
+            sign_bits_r.eq(Mux(self.x_in[15], 0x3, 0)),
+            sign_bits_i.eq(Mux(self.x_in[31], 0x3, 0)),
             xram1_port1.adr.eq(Mux(self.busy, x1p1_adr, inp_ram_adr[1:])),
             xram2a_port1.adr.eq(Mux(self.busy, x2p1_adr, inp_ram_adr[1:])),
             xram2b_port1.adr.eq(Mux(self.busy, x2p1_adr, inp_ram_adr[1:])),
-            xram1_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
-            xram2a_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
-            xram2b_port1.dat_w.eq(Cat(self.x_in[:width_i], C(0, width_int-width_i), self.x_in[width_i:])),
+            xram1_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
+            xram2a_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
+            xram2b_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
             xram1_port1.we.eq(~self.busy & self.x_in_we & ~inp_ram_adr[0]),
             # use LSB of address to switch between rams when loading data
             xram2a_port1.we.eq(~self.busy & self.x_in_we & inp_ram_adr[0]),
