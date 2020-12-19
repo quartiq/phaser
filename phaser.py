@@ -285,15 +285,15 @@ class Phaser(Module):
         self.sync += [
             If(self.decoder.get("stft_en", "read") == 1,  # stft
 
-               self.dac.data[1][0].eq(pulsegen.output[0].i),
-               self.dac.data[3][0].eq(pulsegen.output[1].i),
-               self.dac.data[0][0].eq(pulsegen.output[0].q),
-               self.dac.data[2][0].eq(pulsegen.output[1].q),
+               self.dac.data[1][1].eq(pulsegen.output[0].i),
+               self.dac.data[3][1].eq(pulsegen.output[1].i),
+               self.dac.data[0][1].eq(pulsegen.output[0].q),
+               self.dac.data[2][1].eq(pulsegen.output[1].q),
 
-               # self.dac.data[1][1].eq(self.duc[0].o[0].i),
-               # self.dac.data[3][1].eq(self.duc[0].o[1].i),
-               # self.dac.data[0][1].eq(self.duc[0].o[0].q),
-               # self.dac.data[2][1].eq(self.duc[0].o[1].q),
+               self.dac.data[1][0].eq(self.duc[0].o[0].i),
+               self.dac.data[3][0].eq(self.duc[0].o[1].i),
+               self.dac.data[0][0].eq(self.duc[0].o[0].q),
+               self.dac.data[2][0].eq(self.duc[0].o[1].q),
                ),
 
 
