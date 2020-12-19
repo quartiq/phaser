@@ -1,7 +1,8 @@
 from artiq.experiment import *
 
-# This is a volatile test script to exercise and evaluate some functionality of
-# Phaser through ARTIQ.
+# This is a volatile test script to exercise and evaluate the deterministic timing
+# of the stft pulsegen. Emits a ttl pulse and 3 stft pulses using all 3 branches
+# and a hann shaped window.
 
 class Phaser(EnvExperiment):
     def build(self):
@@ -57,7 +58,7 @@ class Phaser(EnvExperiment):
 
         f.set_stft_enable_flag(1)
 
-        f.pulsegen.set_pulsesettings(disable_shaper=0, gated_output=1)
+        f.pulsegen.set_pulsesettings(disable_window=0, gated_output=1)
         f.pulsegen.set_nr_repeats(3)
         delay(.1 * ms)
         imag = [0 for _ in range(1024)]
