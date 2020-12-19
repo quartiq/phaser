@@ -19,7 +19,10 @@ class Fft_Loader(Module):
 
     """
 
-    def __init__(self, decoder, fft, coef_per_frame):
+    def __init__(self, decoder, fft):
+
+        coef_per_frame = 13
+
         data = [Signal(fft[0].width_i * 2, reset_less=True)
                 for _ in range(coef_per_frame)]
         b_adr = Signal(len(fft[0].x_in_adr))  # frame base adr, fft mem adr will incr. during frame data write
@@ -200,7 +203,6 @@ class Pulsegen(Module):
     """
 
     def __init__(self, decoder, duc=[], width_d=16, size_fft=1024, nr_branches=3):
-        coef_per_frame = 13
 
         while(len(duc) < nr_branches):
             duc.append(PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10))
@@ -211,7 +213,7 @@ class Pulsegen(Module):
 
         self.submodules.shaper = Shaper(decoder, width_d, size_fft)
 
-        self.submodules.loader = Fft_Loader(decoder, [b.fft for b in branch] + [self.shaper.fft], coef_per_frame)
+        self.submodules.loader = Fft_Loader(decoder, [b.fft for b in branch] + [self.shaper.fft])
 
         self.submodules.mult = mult = [RealComplexMultiplier(width_d, width_d, width_d) for _ in range(2)]
 
