@@ -64,9 +64,9 @@ class TestInterpolator(unittest.TestCase):
             return 18 + 20 + 50 + 6 + 2 + 12
         if r == 20:
             if (r // 4) % 2:
-                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 7 + 5 + 2 + 60
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 7 + 5 + 2 + 60 + 2
             else:
-                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 1 + 7 + 5 + 2 + 60
+                return 18 + 20 + 50 + 28 + 6 + 30 + (((r // 4) - 1) * 94) + 1 + 7 + 5 + 2 + 60 + 2
         else:
             ValueError
 
