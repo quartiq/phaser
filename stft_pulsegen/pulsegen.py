@@ -69,8 +69,8 @@ class STFT_Branch(Module):
         self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=18,
                                         width_wram=18)
 
-        self.submodules.inter_i = inter_i = SuperInterpolator(r_max=512)
-        self.submodules.inter_q = inter_q = SuperInterpolator(r_max=512)
+        self.submodules.inter_i = inter_i = SuperInterpolator(r_max=1024)
+        self.submodules.inter_q = inter_q = SuperInterpolator(r_max=1024)
 
         cfg = decoder.get("stft_duc{}_cfg".format(nr), "write")
         self.sync += [
@@ -91,31 +91,16 @@ class STFT_Branch(Module):
         ]
 
         pos = Signal(int(np.log2(size_fft)))  # position in fft mem
-        p = Signal(16, reset=0)  # number repeats
-        pdone = Signal(reset=1)  # pulse done signal
-
-        if nr < 2:  # if duc from phaser classic
-            self.comb += [
-                If(decoder.get("stft_en", "write") != 0,
-                   duc.i[0].i.eq(self.inter_i.output.data0),
-                   duc.i[0].q.eq(self.inter_q.output.data0),
-                   duc.i[1].i.eq(self.inter_i.output.data1),
-                   duc.i[1].q.eq(self.inter_q.output.data1),
-                   )
-            ]
-        else:
-            self.comb += [
-               duc.i[0].i.eq(self.inter_i.output.data0),
-               duc.i[0].q.eq(self.inter_q.output.data0),
-               duc.i[1].i.eq(self.inter_i.output.data1),
-               duc.i[1].q.eq(self.inter_q.output.data1),
-            ]
 
         self.comb += [
             inter_i.input.data.eq(fft.x_out[:width_d]),
             inter_q.input.data.eq(fft.x_out[width_d:]),
             fft.x_out_adr.eq(pos),
-            fft.en.eq(1)
+            fft.en.eq(1),
+            duc.i[0].i.eq(self.inter_i.output.data0),
+            duc.i[0].q.eq(self.inter_q.output.data0),
+            duc.i[1].i.eq(self.inter_i.output.data1),
+            duc.i[1].q.eq(self.inter_q.output.data1),
         ]
 
         self.sync += [
@@ -141,7 +126,7 @@ class Shaper(Module):
         self.submodules.fft = fft = Fft(n=size_fft, ifft=True, width_i=width_d, width_o=width_d, width_int=18,
                                         width_wram=18)
 
-        self.submodules.inter = inter = SuperInterpolator(r_max=2**10)
+        self.submodules.inter = inter = SuperInterpolator(r_max=8192)
 
         pos = Signal(int(np.log2(size_fft)))  # position in fft mem
         p = Signal(16, reset=0)  # number repeats
