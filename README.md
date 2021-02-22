@@ -6,6 +6,9 @@ This repository contains the gateware for the Phaser 4 channel 1 GS/s DAC arbitr
 
 Funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://github.com/OregonIons), [MITLL](https://www.ll.mit.edu/biographies/jeremy-m-sage), [QUARTIQ](https://github.com/quartiq).
 
+This software is licenses under the GNU General Public License version 3 (GPL-3) or
+later.
+
 ## Hardware
 
 The hardware design repository is over at [Sinara](https://github.com/sinara-hw/Phaser).
