@@ -1,8 +1,13 @@
+[![QUARTIQ Matrix Chat](https://img.shields.io/matrix/quartiq:matrix.org)](https://matrix.to/#/#quartiq:matrix.org)
+
 # Phaser gateware
 
 This repository contains the gateware for the Phaser 4 channel 1 GS/s DAC arbitrary waveform generator.
 
 Funded by [Oxford](https://github.com/OxfordIonTrapGroup), [Oregon](https://github.com/OregonIons), [MITLL](https://www.ll.mit.edu/biographies/jeremy-m-sage), [QUARTIQ](https://github.com/quartiq).
+
+This software is licenses under the GNU General Public License version 3 (GPL-3) or
+later.
 
 ## Hardware
 
