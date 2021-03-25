@@ -112,7 +112,7 @@ class Fft(Module):
         cr, ci, dr, di = self._bfl_core(ar, ai, br, bi, s)
 
         # Data Memories
-        xram1 = Memory(width_int * 2, int(n / 2), init=init, name="data1")
+        xram1 = Memory(width_int * 2, int(n / 2), name="data1")
         xram2a = Memory(width_int * 2, int(n / 2), name="data2a")
         xram2b = Memory(width_int * 2, int(n / 2), name="data2b")
         xram1_port1 = xram1.get_port(write_capable=True, mode=READ_FIRST)
