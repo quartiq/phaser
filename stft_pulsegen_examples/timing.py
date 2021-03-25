@@ -104,9 +104,7 @@ class Phaser(EnvExperiment):
         delay(.1 * ms)
 
         f.pulsegen.get_frame_timestamp()
-        at_mu(int64(f.pulsegen.frame_tstamp + 0xfffff))
-        delay_mu(int64(f.pulsegen.tframe) * 20)
-        t = now_mu()
+        t = now_mu()+(int64(f.pulsegen.tframe) * 20000)
         loopdelay = 200000 * f.pulsegen.tframe
         for i in range(100000):
             at_mu(t)
