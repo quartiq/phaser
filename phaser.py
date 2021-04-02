@@ -259,9 +259,9 @@ class Phaser(Module):
 if __name__ == "__main__":
     from migen.build.platforms.sinara.phaser import Platform
     platform = Platform()
-    platform.toolchain.additional_commands.extend([
-        "set argv phaser.bit",
-        "source ../load.tcl",
-    ])
+    # platform.toolchain.additional_commands.extend([
+    #     "set argv phaser.bit",
+    #     "source ../load.tcl",
+    # ])
     top = Phaser(platform)
     platform.build(top, build_name="phaser")
