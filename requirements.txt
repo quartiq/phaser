@@ -1,0 +1,4 @@
+-egit+https://github.com/m-labs/migen.git@3ffd64c#egg=migen
+-egit+https://github.com/m-labs/misoc.git@d845514#egg=misoc
+numpy
+pytest
