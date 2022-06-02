@@ -57,8 +57,6 @@ class Iir(Module):
         shift_c = len(dsp.p) - w_data - gainbits - 1
         shift_a = len(dsp.a) - w_coeff
         shift_b = len(dsp.b) - w_data
-        a_rounding_offset = (1 << shift_a - 1) - 1 if shift_a > 0 else 0
-        b_rounding_offset = (1 << shift_b - 1) - 1 if shift_b > 0 else 0
         c_rounding_offset = (1 << shift_c - 1) - 1
 
         self.sync += [
@@ -82,14 +80,10 @@ class Iir(Module):
                busy.eq(0),
                stb_out.eq(1),
                [x1.eq(x0) for x1, x0 in zip(xy[1][pp], xy[0][pp])]),
-            dsp.a[shift_a: shift_a + w_coeff].eq(ab[step][pp][pc]),
-            dsp.b[shift_b: shift_b + w_data].eq(xy[step][pp][pc]),
+            dsp.a.eq(ab[step][pp][pc] << shift_a),
+            dsp.b.eq(xy[step][pp][pc] << shift_b),
             dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]
-        if a_rounding_offset > 0:
-            self.sync += dsp.a[:shift_a - 1].eq(a_rounding_offset)
-        if b_rounding_offset > 0:
-            self.sync += dsp.b[:shift_b - 1].eq(b_rounding_offset)
         self.comb += [
             pp.eq(ch_profile[pc]),
             [outp.eq(y0) for outp, y0 in zip(outp, xy[2][pp])]
