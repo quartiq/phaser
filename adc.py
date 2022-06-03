@@ -54,11 +54,13 @@ class Adc(Module):
         self.sck_continuous = sck_continous = Signal()
 
         if pins != None:
-            DifferentialOutput(~sck, pins.sck_n, pins.sck_p)  # swapped
-            DifferentialInput(pins.clkout_p, pins.clkout_n, clkout)
-            DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p)  # swapped
-            DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0])
-            DifferentialInput(pins.sdo_n[1], pins.sdo_p[1], sdo2n)  # swapped
+            self.specials += [
+            DifferentialOutput(~sck, pins.sck_n, pins.sck_p),  # swapped
+            DifferentialInput(pins.clkout_p, pins.clkout_n, clkout),
+            DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p),  # swapped
+            DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0]),
+            DifferentialInput(pins.sdo_n[1], pins.sdo_p[1], sdo2n),  # swapped
+            ]
 
         self.comb += [
             sdo[1].eq(~sdo2n),  # invert due to swapped input

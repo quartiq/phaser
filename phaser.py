@@ -219,12 +219,12 @@ class Phaser(Module):
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
                 ]
-                # self.sync += [
-                #     If(cfg[2:4] == 0,  # ducx_cfg_sel
-                #         self.dac.data[2*t][ch].eq(to.i),
-                #         self.dac.data[2*t + 1][ch].eq(to.q),
-                #        )
-                # ]
+                self.sync += [
+                    If(cfg[2:4] == 0,  # ducx_cfg_sel
+                        self.dac.data[2*t][ch].eq(to.i),
+                        self.dac.data[2*t + 1][ch].eq(to.q),
+                       )
+                ]
 
             self.sync += [
                 If(cfg[2:4] == 1,  # ducx_cfg_sel
@@ -234,16 +234,16 @@ class Phaser(Module):
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
                    ),
 
-                # hack in adc data
-                self.dac.data[1][1].eq(adc.data[0]),
-                self.dac.data[3][1].eq(adc.data[0]),
-                self.dac.data[0][1].eq(adc.data[0]),
-                self.dac.data[2][1].eq(adc.data[0]),
+                # hack in adc data (overwrite)
+                self.dac.data[1][0].eq(adc.data[0]),
+                self.dac.data[3][0].eq(adc.data[0]),
+                self.dac.data[0][0].eq(adc.data[0]),
+                self.dac.data[2][0].eq(adc.data[0]),
 
-                self.dac.data[1][0].eq(adc.data[1]),
-                self.dac.data[3][0].eq(adc.data[1]),
-                self.dac.data[0][0].eq(adc.data[1]),
-                self.dac.data[2][0].eq(adc.data[1]),
+                # self.dac.data[3][1].eq(adc.data[1]),
+                # self.dac.data[0][1].eq(adc.data[1]),
+                # self.dac.data[2][1].eq(adc.data[1]),
+                # self.dac.data[1][1].eq(adc.data[1]),
             ]
             self.comb += [
                 # even sample just before the oserdes
@@ -257,21 +257,25 @@ class Phaser(Module):
                 ClockSignal("clk125"),
                 ClockSignal("link"),
                 # ClockSignal(),
-                ResetSignal(),
-                # self.link.slip.bitslip,
-                # self.link.unframe.data[0],
-                # self.link.unframe.data[1],
-                # self.link.unframe.clk_stb,
-                # self.link.unframe.marker_stb,
-                # self.link.unframe.end_of_frame,
-                self.link.checker.frame_stb,
-                # self.decoder.bus.bus.we,
-                # self.decoder.bus.bus.re,
-                # self.decoder.bus.bus.adr[0],
-                self.link.checker.miso,
-                # self.dac.data_sync,
-                self.dac.istr,
-                dac_ctrl.alarm,
+                # ResetSignal(),
+                # # self.link.slip.bitslip,
+                # # self.link.unframe.data[0],
+                # # self.link.unframe.data[1],
+                # # self.link.unframe.clk_stb,
+                # # self.link.unframe.marker_stb,
+                # # self.link.unframe.end_of_frame,
+                # self.link.checker.frame_stb,
+                # # self.decoder.bus.bus.we,
+                # # self.decoder.bus.bus.re,
+                # # self.decoder.bus.bus.adr[0],
+                # self.link.checker.miso,
+                # # self.dac.data_sync,
+                # self.dac.istr,
+                # dac_ctrl.alarm,
+                adc.clkout,
+                adc.sdo[0],
+                adc.sdo[1],
+                adc.data[0][0],
             ))
         ]
 
