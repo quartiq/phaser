@@ -47,7 +47,7 @@ class Adc(Module):
         self.sck = sck = Signal()
         self.sck_en = sck_en = Signal()
         self.clkout = clkout = Signal()
-        self.convn = convn = Signal()
+        self.cnvn = cnvn = Signal()
         self.sdo = sdo = [Signal(), Signal()]
         self.sdo2n = sdo2n = Signal()  # inverted input
 
@@ -56,7 +56,7 @@ class Adc(Module):
         if pins != None:
             DifferentialOutput(~sck, pins.sck_n, pins.sck_p)  # swapped
             DifferentialInput(pins.clkout_p, pins.clkout_n, clkout)
-            DifferentialOutput(~convn, pins.convn_n, pins.convn_p)  # swapped
+            DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p)  # swapped
             DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0])
             DifferentialInput(pins.sdo_n[1], pins.sdo_p[1], sdo2n)  # swapped
 
@@ -95,7 +95,7 @@ class Adc(Module):
                 )
         fsm.act("CNVH",
                 count_load.eq(p.t_conv - 1),
-                convn.eq(1),
+                cnvn.eq(1),
                 If(count_done,
                     NextState("CONV")
                    )
@@ -157,13 +157,13 @@ class Adc(Module):
 
 #         self.cnt = cnt = Signal(max=)  # count to 50
 #         self.sck = sck = Signal()
-#         self.convn = convn = Signal()
+#         self.cnvn = cnvn = Signal()
 #         self.sdo1 = sdo1 = Signal()
 #         self.sdo2n = sdo2n = Signal()  # inverted input
 #         self.sdo2 = sdo2 = Signal()
 
 #         DifferentialOutput(~sck, pins.sck_n, pins.sck_p)  # swapped
-#         DifferentialOutput(~convn, pins.convn_n, pins.convn_p)  # swapped
+#         DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p)  # swapped
 #         DifferentialInput(sdo1, pins.sdo_n[0], pins.sdo_p[0])
 #         DifferentialInput(sdo2n, pins.sdo_p[1], pins.sdo_n[1])  # swapped
 #         self.comb += sdo2.eq(sdo2n)  # invert due to swapped input
@@ -171,7 +171,7 @@ class Adc(Module):
 #         self.sync += [
 #             cnt.eq(cnt+1),
 
-#             If(cnt == CONV_LOW - 1, convn.eq(0)),
-#             If(cnt == DATA_START - 1, convn.eq(0)),
+#             If(cnt == CONV_LOW - 1, cnvn.eq(0)),
+#             If(cnt == DATA_START - 1, cnvn.eq(0)),
 
 #         ]
