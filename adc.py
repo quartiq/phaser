@@ -1,3 +1,6 @@
+# sdo[0] is the second input channel and I think it's inverted
+# testpoints
+
 import logging
 from collections import namedtuple
 from migen.genlib.io import DifferentialInput, DifferentialOutput

@@ -223,6 +223,11 @@ class Phaser(Module):
                     If(cfg[2:4] == 0,  # ducx_cfg_sel
                         self.dac.data[2*t][ch].eq(to.i),
                         self.dac.data[2*t + 1][ch].eq(to.q),
+                        # hack in adc data (overwrite)
+                        self.dac.data[1][0].eq(adc.data[0]),
+                        self.dac.data[3][0].eq(adc.data[0]),
+                        self.dac.data[0][0].eq(adc.data[0]),
+                        self.dac.data[2][0].eq(adc.data[0]),
                        )
                 ]
 
@@ -234,11 +239,7 @@ class Phaser(Module):
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
                    ),
 
-                # hack in adc data (overwrite)
-                self.dac.data[1][0].eq(adc.data[0]),
-                self.dac.data[3][0].eq(adc.data[0]),
-                self.dac.data[0][0].eq(adc.data[0]),
-                self.dac.data[2][0].eq(adc.data[0]),
+                
 
                 # self.dac.data[3][1].eq(adc.data[1]),
                 # self.dac.data[0][1].eq(adc.data[1]),
