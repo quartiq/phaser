@@ -1,6 +1,3 @@
-# sdo[0] is the second input channel and I think it's inverted
-# testpoints
-
 import logging
 from collections import namedtuple
 from migen.genlib.io import DifferentialInput, DifferentialOutput
@@ -132,7 +129,8 @@ class Adc(Module):
 
         k = p.channels//p.lanes
         assert t_read == k*p.width*2
-        for i, sdo in enumerate(sdo):
+        # flip sdos because the inputs on the ADC are flipped on schematic 
+        for i, sdo in enumerate(reversed(sdo)):
             sdo_sr = Signal(2*t_read)
             self.sync.ret += [
                 sdo_sr[1:].eq(sdo_sr),
@@ -144,39 +142,3 @@ class Adc(Module):
                        ).eq(sdo_sr)
                    )
             ]
-
-
-# from migen import *
-# from migen.genlib.io import DifferentialInput, DifferentialOutput
-# from collections import namedtuple
-
-# # CLKOUT?
-
-
-# class Adc(Module):
-#     def __init__(self, pins):
-#         self.channel0 = Signal((16, True))  # channel 0 data
-#         self.channel1 = Signal((16, True))  # channel 1 data
-#         self.stb = Signal()  # new sample strobe
-#         ###
-
-#         self.cnt = cnt = Signal(max=)  # count to 50
-#         self.sck = sck = Signal()
-#         self.cnvn = cnvn = Signal()
-#         self.sdo1 = sdo1 = Signal()
-#         self.sdo2n = sdo2n = Signal()  # inverted input
-#         self.sdo2 = sdo2 = Signal()
-
-#         DifferentialOutput(~sck, pins.sck_n, pins.sck_p)  # swapped
-#         DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p)  # swapped
-#         DifferentialInput(sdo1, pins.sdo_n[0], pins.sdo_p[0])
-#         DifferentialInput(sdo2n, pins.sdo_p[1], pins.sdo_n[1])  # swapped
-#         self.comb += sdo2.eq(sdo2n)  # invert due to swapped input
-
-#         self.sync += [
-#             cnt.eq(cnt+1),
-
-#             If(cnt == CONV_LOW - 1, cnvn.eq(0)),
-#             If(cnt == DATA_START - 1, cnvn.eq(0)),
-
-#         ]
