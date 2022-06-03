@@ -6,10 +6,12 @@ from crg import CRG
 from link import Link
 from decode import Decode, Register
 from dac_data import DacData
+from adc import Adc, AdcParams
 
 
 class PWM(Module):
     """Pulse width modulation"""
+
     def __init__(self, pin, width=10):
         cnt = Signal(width, reset_less=True)
         self.duty = Signal.like(cnt)
@@ -17,10 +19,10 @@ class PWM(Module):
             cnt.eq(cnt + 1),
             If(cnt == 0,
                 pin.eq(1),
-            ),
+               ),
             If(cnt == self.duty,
                 pin.eq(0),
-            ),
+               ),
         ]
 
 
@@ -99,7 +101,7 @@ class Phaser(Module):
             ("duc0_p", Register(), Register()),
             # dac data
             ("dac0_data", Register(write=False), Register(write=False),
-                          Register(write=False), Register(write=False)),
+             Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac0_test", Register(), Register(), Register(), Register()),
             (0x20,),
@@ -113,7 +115,7 @@ class Phaser(Module):
             ("duc1_p", Register(), Register()),
             # dac data
             ("dac1_data", Register(write=False), Register(write=False),
-                          Register(write=False), Register(write=False)),
+             Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
         ])
@@ -179,6 +181,13 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
+        # 5 MSps, timing adjusted for LTC2323-16
+        adc_p = AdcParams(width=16, channels=2, lanes=2,
+                          t_cnvh=8, t_conv=3, t_rtt=6)
+
+        self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
+        self.comb += adc.start.eq(1)
+
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
             # sync istr counter every frame
@@ -198,24 +207,24 @@ class Phaser(Module):
                     # clear accu once
                     If(cfg[1],
                         duc.clr.eq(1),
-                    ),
+                       ),
                     duc.f.eq(self.decoder.get("duc{}_f".format(ch), "write")),
                     # msb align to 19 bit duc.p
                     duc.p[3:].eq(
                         self.decoder.get("duc{}_p".format(ch), "write")),
-                ),
+                   ),
             ]
             for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
                 self.comb += [
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
                 ]
-                self.sync += [
-                    If(cfg[2:4] == 0,  # ducx_cfg_sel
-                        self.dac.data[2*t][ch].eq(to.i),
-                        self.dac.data[2*t + 1][ch].eq(to.q),
-                    )
-                ]
+                # self.sync += [
+                #     If(cfg[2:4] == 0,  # ducx_cfg_sel
+                #         self.dac.data[2*t][ch].eq(to.i),
+                #         self.dac.data[2*t + 1][ch].eq(to.q),
+                #        )
+                # ]
 
             self.sync += [
                 If(cfg[2:4] == 1,  # ducx_cfg_sel
@@ -223,7 +232,18 @@ class Phaser(Module):
                     # repeat the test data to fill the oserdes
                     Cat([d[ch] for d in self.dac.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
-                )
+                   ),
+
+                # hack in adc data
+                self.dac.data[1][1].eq(adc.data[0]),
+                self.dac.data[3][1].eq(adc.data[0]),
+                self.dac.data[0][1].eq(adc.data[0]),
+                self.dac.data[2][1].eq(adc.data[0]),
+
+                self.dac.data[1][0].eq(adc.data[1]),
+                self.dac.data[3][0].eq(adc.data[1]),
+                self.dac.data[0][0].eq(adc.data[1]),
+                self.dac.data[2][0].eq(adc.data[1]),
             ]
             self.comb += [
                 # even sample just before the oserdes
@@ -236,14 +256,14 @@ class Phaser(Module):
             Cat([platform.request("test_point", i) for i in range(6)]).eq(Cat(
                 ClockSignal("clk125"),
                 ClockSignal("link"),
-                #ClockSignal(),
+                # ClockSignal(),
                 ResetSignal(),
-                #self.link.slip.bitslip,
-                #self.link.unframe.data[0],
-                #self.link.unframe.data[1],
-                #self.link.unframe.clk_stb,
-                #self.link.unframe.marker_stb,
-                #self.link.unframe.end_of_frame,
+                # self.link.slip.bitslip,
+                # self.link.unframe.data[0],
+                # self.link.unframe.data[1],
+                # self.link.unframe.clk_stb,
+                # self.link.unframe.marker_stb,
+                # self.link.unframe.end_of_frame,
                 self.link.checker.frame_stb,
                 # self.decoder.bus.bus.we,
                 # self.decoder.bus.bus.re,

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 # all times in cycles
-AdcParams = namedtuple("ADCParams", [
+AdcParams = namedtuple("AdcParams", [
     "channels",  # number of channels per lane
     "lanes",    # number of SDO? data lanes
                 # lanes need to be named alphabetically and contiguous
@@ -67,8 +67,8 @@ class Adc(Module):
 
         # set up counters for the four states CNVH, CONV, READ, RTT
         t_read = 2 * p.width*p.channels//p.lanes  # SDR
-        # assert p.lanes*t_read == p.width*p.channels
-        # assert all(_ > 0 for _ in (p.t_cnvh, p.t_conv, p.t_rtt))
+        assert p.lanes*t_read == p.width*p.channels*2
+        assert all(_ > 0 for _ in (p.t_cnvh, p.t_conv, p.t_rtt))
         assert p.t_conv > 1
         count = Signal(max=max(p.t_cnvh, p.t_conv, t_read, p.t_rtt),
                        reset_less=True)
