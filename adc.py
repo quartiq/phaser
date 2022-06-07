@@ -1,6 +1,6 @@
 import logging
 from collections import namedtuple
-from migen.genlib.io import DifferentialInput, DifferentialOutput
+from migen.genlib.io import DifferentialInput, DifferentialOutput, DDROutput
 
 
 from migen import *
@@ -37,7 +37,7 @@ class Adc(Module):
     def __init__(self, pins, params):
         self.params = p = params  # ADCParams
         self.data = [Signal((p.width, True), reset_less=True)
-                     for i in range(p.channels)]  # retrieved ADC data
+                     for _ in range(p.channels)]  # retrieved ADC data
         self.start = Signal()    # start conversion and reading
         self.reading = Signal()  # data is being read (outputs are invalid)
         self.done = Signal()     # data is valid and a new conversion can be started
@@ -46,30 +46,35 @@ class Adc(Module):
 
         self.sck = sck = Signal()
         self.sck_en = sck_en = Signal()
+        # self.clkout_in = clkout_in = Signal()
         self.clkout = clkout = Signal()
         self.cnvn = cnvn = Signal()
         self.sdo = sdo = [Signal(), Signal()]
         self.sdo2n = sdo2n = Signal()  # inverted input
-
-        self.sck_continuous = sck_continous = Signal()
+        self.ddr_clk_synth = ddr_clk_synth = Signal(
+            2)  # signal to generate a 10ns period clock
 
         if pins != None:
             self.specials += [
-            DifferentialOutput(~sck, pins.sck_n, pins.sck_p),  # swapped
-            DifferentialInput(pins.clkout_p, pins.clkout_n, clkout),
-            DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p),  # swapped
-            DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0]),
-            DifferentialInput(pins.sdo_n[1], pins.sdo_p[1], sdo2n),  # swapped
+                DifferentialOutput(
+                    sck, pins.sck_n, pins.sck_p),  # swapped
+                DifferentialInput(pins.clkout_p, pins.clkout_n, clkout),
+                DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p),  # swapped
+                DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0]),
+                DifferentialInput(
+                    pins.sdo_n[1], pins.sdo_p[1], sdo2n),  # swapped
+                DDROutput(
+                    self.ddr_clk_synth[0], self.ddr_clk_synth[1], sck, ClockSignal("sys")),
+                # Instance("BUFR", i_I=clkout_in, o_O=clkout)
             ]
 
         self.comb += [
             sdo[1].eq(~sdo2n),  # invert due to swapped input
-            sck.eq(sck_continous | ~sck_en),  # half frequency sys clock, gated
         ]
 
         # set up counters for the four states CNVH, CONV, READ, RTT
-        t_read = 2 * p.width*p.channels//p.lanes  # SDR
-        assert p.lanes*t_read == p.width*p.channels*2
+        t_read = 3 * p.width*p.channels//p.lanes  # SDR
+        assert p.lanes*t_read == p.width*p.channels*3
         assert all(_ > 0 for _ in (p.t_cnvh, p.t_conv, p.t_rtt))
         assert p.t_conv > 1
         count = Signal(max=max(p.t_cnvh, p.t_conv, t_read, p.t_rtt),
@@ -80,11 +85,12 @@ class Adc(Module):
 
         self.comb += count_done.eq(count == 0)
         self.sync += [
-            sck_continous.eq(~sck_continous),
             count.eq(count - 1),
             If(count_done,
                count.eq(count_load),
-               )
+               ),
+            If(sck_en, Cat(ddr_clk_synth).eq(Cat(1, ddr_clk_synth))),
+            If(ddr_clk_synth == 0b11, ddr_clk_synth.eq(0))
         ]
 
         self.submodules.fsm = fsm = FSM("IDLE")
@@ -128,8 +134,8 @@ class Adc(Module):
         self.comb += self.cd_ret.clk.eq(clkout)
 
         k = p.channels//p.lanes
-        assert t_read == k*p.width*2
-        # flip sdos because the inputs on the ADC are flipped on schematic 
+        assert t_read == k*p.width*3
+        # flip sdos because the inputs on the ADC are flipped on schematic
         for i, sdo in enumerate(reversed(sdo)):
             sdo_sr = Signal(2*t_read)
             self.sync.ret += [

@@ -37,7 +37,7 @@ class Iir(Module):
         self.outp = outp = Array(Signal((w_data, True))
                                  for _ in range(nr_channels))
         # ab registers for all channels and profiles
-        self.ab = ab = Array(Array(Array(Signal((w_coeff, True)) for _ in range(nr_channels))
+        self.ab = ab = Array(Array(Array(Signal((w_coeff, True), reset=10000) for _ in range(nr_channels))
                                    for _ in range(nr_profiles)) for _ in range(NR_COEFF))
         self.offset = offset = Array(Array(Signal((w_data, True))
                                            for _ in range(nr_channels)) for _ in range(nr_profiles))
