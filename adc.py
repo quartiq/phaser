@@ -64,8 +64,7 @@ class Adc(Module):
                 DifferentialInput(
                     pins.sdo_n[1], pins.sdo_p[1], sdo2n),  # swapped
                 DDROutput(
-                    self.ddr_clk_synth[0], self.ddr_clk_synth[1], sck, ClockSignal("sys")),
-                # Instance("BUFR", i_I=clkout_in, o_O=clkout)
+                    ddr_clk_synth[1], ddr_clk_synth[0], sck, ClockSignal("sys"))
             ]
 
         self.comb += [

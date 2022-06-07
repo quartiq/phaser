@@ -183,10 +183,11 @@ class Phaser(Module):
         ]
 
         # 5 MSps, timing adjusted for LTC2323-16
-        # 32 ns t_cnvh, 12 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 28 ns t_rtt/tDSCKLCNVH
-        # Note that there is one extra cycle at the end of a transaction.
+        # 32 ns t_cnvh, 12 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 16 ns t_rtt/tDSCKLCNVH
+        # Note that there is one extra cycle (4 ns) at the end of a transaction.
+        # Total: 248 ns -> 4.03 MSps
         adc_p = AdcParams(width=16, channels=2, lanes=2,
-                          t_cnvh=8, t_conv=4, t_rtt=10)
+                          t_cnvh=8, t_conv=3, t_rtt=6)
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
