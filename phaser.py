@@ -192,8 +192,11 @@ class Phaser(Module):
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
         self.submodules.iir = iir = Iir(
-            w_coeff=30, w_data=16, gainbits=0, nr_profiles=3, nr_channels=2)
-        # self.comb += [inp.eq(data) for inp, data in iir.inp, adc.data]
+            w_coeff=16, w_data=16, gainbits=4, nr_profiles=2, nr_channels=2)
+        self.comb += [
+            [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
+            iir.stb_in.eq(adc.done)
+        ]
 
         self.submodules.dac = DacData(platform.request("dac_data"))
         self.comb += [
@@ -231,10 +234,10 @@ class Phaser(Module):
                         self.dac.data[2*t][ch].eq(to.i),
                         self.dac.data[2*t + 1][ch].eq(to.q),
                         # hack in adc data (overwrite)
-                        self.dac.data[1][0].eq(adc.data[0]),
-                        self.dac.data[3][0].eq(adc.data[0]),
-                        self.dac.data[0][0].eq(adc.data[0]),
-                        self.dac.data[2][0].eq(adc.data[0]),
+                        self.dac.data[1][0].eq(iir.outp[0]),
+                        self.dac.data[3][0].eq(iir.outp[0]),
+                        self.dac.data[0][0].eq(iir.outp[0]),
+                        self.dac.data[2][0].eq(iir.outp[0]),
 
                         # self.dac.data[3][1].eq(adc.data[1]),
                         # self.dac.data[0][1].eq(adc.data[1]),
@@ -250,9 +253,6 @@ class Phaser(Module):
                     Cat([d[ch] for d in self.dac.data]).eq(Replicate(
                         self.decoder.get("dac{}_test".format(ch), "write"), 2))
                    ),
-
-
-
 
             ]
             self.comb += [

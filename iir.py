@@ -15,7 +15,7 @@ NR_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
 class Dsp(Module):
     def __init__(self):
         # xilinx dsp architecture (subset)
-        self.a = a = Signal((30, True), reset_less=True)
+        self.a = a = Signal((25, True), reset_less=True)
         self.b = b = Signal((18, True), reset_less=True)
         self.c = c = Signal((48, True), reset_less=True)
         self.mux_p = mux_p = Signal()  # accumulator mux
@@ -37,7 +37,7 @@ class Iir(Module):
         self.outp = outp = Array(Signal((w_data, True))
                                  for _ in range(nr_channels))
         # ab registers for all channels and profiles
-        self.ab = ab = Array(Array(Array(Signal((w_coeff, True), reset=10000) for _ in range(nr_channels))
+        self.ab = ab = Array(Array(Array(Signal((w_coeff, True), reset=0x4000) for _ in range(nr_channels))
                                    for _ in range(nr_profiles)) for _ in range(NR_COEFF))
         self.offset = offset = Array(Array(Signal((w_data, True))
                                            for _ in range(nr_channels)) for _ in range(nr_profiles))
