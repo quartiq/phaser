@@ -3,8 +3,7 @@
 #
 # round half down
 #
-# Notes: I don't know how the "out or range" extra channel to wait for DSP pipe gets
-# synthesized as the selector for data register array.
+# Note: Migen translates the "out of range" pc mux selector to the last vaid mux input.
 #
 # Maybe Todo: replace [pc != 0] with [!OR(pc)]
 from migen import *
