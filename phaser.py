@@ -9,6 +9,9 @@ from dac_data import DacData
 from adc import Adc, AdcParams
 from iir import Iir
 
+SERVO_PROFILES = 4  # number iir coefficient profiles per servo channel
+SERVO_CHANNELS = 2  # number servochannels
+
 
 class PWM(Module):
     """Pulse width modulation"""
@@ -119,7 +122,18 @@ class Phaser(Module):
              Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
-        ])
+
+            # servo regs
+            # (ch1_profile[3], ch0_profile[3], en)
+            ("servo_cfg", Register()),
+        ] +
+            # ab register
+            [(f"ch{i}_profile{j}_coeff{k}", Register(), Register(), Register())
+             for k in range(3) for j in range(SERVO_PROFILES) for i in range(SERVO_CHANNELS)]
+            # offset register
+            + [(f"ch{i}_profile{j}_offset", Register(), Register())
+               for j in range(4) for i in range(2)]
+        )
 
         dac_ctrl = platform.request("dac_ctrl")
         trf_ctrl = [platform.request("trf_ctrl") for _ in range(2)]
@@ -191,8 +205,8 @@ class Phaser(Module):
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
-        self.submodules.iir = iir = Iir(
-            w_coeff=16, w_data=16, gainbits=4, nr_profiles=2, nr_channels=2)
+        self.submodules.iir = iir = Iir(self.decoder, w_coeff=24, w_data=16,
+                                        gainbits=4, nr_profiles=SERVO_PROFILES, nr_channels=SERVO_CHANNELS)
         self.comb += [
             [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
             iir.stb_in.eq(adc.done)

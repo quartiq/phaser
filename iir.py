@@ -27,7 +27,7 @@ class Dsp(Module):
 
 
 class Iir(Module):
-    def __init__(self, w_coeff, w_data, gainbits, nr_profiles, nr_channels):
+    def __init__(self, decoder, w_coeff, w_data, gainbits, nr_profiles, nr_channels):
         # input strobe signal (start processing all channels)
         self.stb_in = stb_in = Signal()
         self.stb_out = stb_out = Signal()  # output strobe signal (all channels done)
@@ -36,7 +36,7 @@ class Iir(Module):
         self.outp = outp = Array(Signal((w_data, True))
                                  for _ in range(nr_channels))
         # ab registers for all channels and profiles
-        self.ab = ab = Array(Array(Array(Signal((w_coeff, True), reset=0x4000) for _ in range(nr_channels))
+        self.ab = ab = Array(Array(Array(Signal((w_coeff, True)) for _ in range(nr_channels))
                                    for _ in range(nr_profiles)) for _ in range(NR_COEFF))
         self.offset = offset = Array(Array(Signal((w_data, True))
                                            for _ in range(nr_channels)) for _ in range(nr_profiles))
@@ -53,10 +53,18 @@ class Iir(Module):
         self.submodules.dsp = dsp = Dsp()
         assert w_data <= len(dsp.b)
         assert w_coeff <= len(dsp.a)
-        shift_c = len(dsp.p) - w_data - gainbits - 1
+        shift_c = len(dsp.a) + len(dsp.b) - w_data - gainbits - 1
         shift_a = len(dsp.a) - w_coeff
         shift_b = len(dsp.b) - w_data
         c_rounding_offset = (1 << shift_c - 1) - 1
+
+        if decoder != None:
+            self.comb += [ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "read")) for i in range(
+                nr_channels) for j in range(nr_profiles) for k in range(NR_COEFF)]
+            self.comb += [offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "read")) for i in range(
+                nr_channels) for j in range(nr_profiles)]
+            self.servo_cfg_reg = Signal(8)
+            self.comb += Cat(self.ch_profile).eq(self.servo_cfg_reg >> 1)
 
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
@@ -70,12 +78,14 @@ class Iir(Module):
                     dsp.mux_p.eq(1),
                     step.eq(0),
                     pc.eq(pc + 1),
+                    pp.eq(ch_profile[pc+1]),
                     If(pc != 0,
                         xy[2][pp][pc-1].eq(dsp.p >> shift_c))),
                ),
             # if done with all channels and last data through dsp
             If((pc == nr_channels) & (step == 2),
                pc.eq(0),
+               pp.eq(ch_profile[0]),
                busy.eq(0),
                stb_out.eq(1),
                [x1.eq(x0) for x1, x0 in zip(xy[1][pp], xy[0][pp])]),
@@ -84,6 +94,5 @@ class Iir(Module):
             dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]
         self.comb += [
-            pp.eq(ch_profile[pc]),
             [outp.eq(y0) for outp, y0 in zip(outp, xy[2][pp])]
         ]
