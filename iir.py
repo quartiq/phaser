@@ -63,8 +63,8 @@ class Iir(Module):
                 nr_channels) for j in range(nr_profiles) for k in range(NR_COEFF)]
             self.comb += [offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "read")) for i in range(
                 nr_channels) for j in range(nr_profiles)]
-            self.servo_cfg_reg = Signal(8)
-            self.comb += Cat(self.ch_profile).eq(self.servo_cfg_reg >> 1)
+            self.sync += If(stb_in, Cat(self.ch_profile).eq(
+                decoder.get(f"servo_cfg", "read") >> 1))
 
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
