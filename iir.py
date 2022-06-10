@@ -69,8 +69,8 @@ class Iir(Module):
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
             stb_out.eq(0),
-            If(stb_in, busy.eq(1), [
-               x0.eq(inp) for x0, inp in zip(xy[0][pp], inp)]),
+            If(stb_in, busy.eq(1), pp.eq(ch_profile[pc]), [[
+               x0.eq(inp) for x0, inp in zip(xy[0][ch_profile[ch]], inp)] for ch in range(nr_channels)]),
             If(busy,
                 step.eq(step+1),
                 If(step == 1, dsp.mux_p.eq(0)),
@@ -79,8 +79,8 @@ class Iir(Module):
                     step.eq(0),
                     pc.eq(pc + 1),
                     pp.eq(ch_profile[pc+1]),
-                    If(pc != 0,
-                        xy[2][pp][pc-1].eq(dsp.p >> shift_c))),
+                    If((pc != 0) & (pc != nr_channels+1),
+                        xy[2][ch_profile[pc-1]][pc-1].eq(dsp.p >> shift_c))),
                ),
             # if done with all channels and last data through dsp
             If((pc == nr_channels) & (step == 2),
@@ -88,11 +88,12 @@ class Iir(Module):
                pp.eq(ch_profile[0]),
                busy.eq(0),
                stb_out.eq(1),
-               [x1.eq(x0) for x1, x0 in zip(xy[1][pp], xy[0][pp])]),
+               [[x1.eq(x0) for x1, x0 in zip(xy[1][ch_profile[ch]], xy[0][ch_profile[ch]])] for ch in range(nr_channels)]),
             dsp.a.eq(ab[step][pp][pc] << shift_a),
             dsp.b.eq(xy[step][pp][pc] << shift_b),
             dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]
         self.comb += [
+            # pp.eq(ch_profile[pc]),
             [outp.eq(y0) for outp, y0 in zip(outp, xy[2][pp])]
         ]
