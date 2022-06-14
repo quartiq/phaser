@@ -54,17 +54,22 @@ class Iir(Module):
         assert w_data <= len(dsp.b)
         assert w_coeff <= len(dsp.a)
         shift_c = len(dsp.a) + len(dsp.b) - w_data - gainbits - 1
+        # shift_c = w_coeff + w_data - w_data - gainbits - 1
+        # shift_c = 0
+        # shift_a = 0
+        # shift_b = 0
         shift_a = len(dsp.a) - w_coeff
         shift_b = len(dsp.b) - w_data
         c_rounding_offset = (1 << shift_c - 1) - 1
+        # c_rounding_offset = 0
 
         if decoder != None:
-            self.comb += [ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "read")) for i in range(
+            self.comb += [ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "write")) for i in range(
                 nr_channels) for j in range(nr_profiles) for k in range(NR_COEFF)]
-            self.comb += [offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "read")) for i in range(
+            self.comb += [offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "write")) for i in range(
                 nr_channels) for j in range(nr_profiles)]
             self.sync += If(stb_in, Cat(self.ch_profile).eq(
-                decoder.get(f"servo_cfg", "read") >> 1))
+                decoder.get(f"servo_cfg", "write") >> 1))
 
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle

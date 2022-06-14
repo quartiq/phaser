@@ -123,16 +123,18 @@ class Phaser(Module):
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
 
-            # servo regs
+            # 48 regs
+
+            # 71 servo regs
             # (ch1_profile[3], ch0_profile[3], en)
             ("servo_cfg", Register()),
         ] +
             # ab register
-            [(f"ch{i}_profile{j}_coeff{k}", Register(), Register(), Register())
-             for k in range(3) for j in range(SERVO_PROFILES) for i in range(SERVO_CHANNELS)]
+            [(f"ch{i}_profile{j}_coeff{k}", Register(read=False), Register(read=False))
+             for i in range(SERVO_CHANNELS) for j in range(SERVO_PROFILES) for k in range(3)]
             # offset register
-            + [(f"ch{i}_profile{j}_offset", Register(), Register())
-               for j in range(4) for i in range(2)]
+            + [(f"ch{i}_profile{j}_offset", Register(read=False), Register(read=False))
+               for i in range(SERVO_CHANNELS) for j in range(SERVO_PROFILES)]
         )
 
         dac_ctrl = platform.request("dac_ctrl")
@@ -205,8 +207,8 @@ class Phaser(Module):
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
-        self.submodules.iir = iir = Iir(self.decoder, w_coeff=24, w_data=16,
-                                        gainbits=4, nr_profiles=SERVO_PROFILES, nr_channels=SERVO_CHANNELS)
+        self.submodules.iir = iir = Iir(self.decoder, w_coeff=16, w_data=16,
+                                        gainbits=1, nr_profiles=SERVO_PROFILES, nr_channels=SERVO_CHANNELS)
         self.comb += [
             [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
             iir.stb_in.eq(adc.done)
