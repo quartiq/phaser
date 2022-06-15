@@ -122,11 +122,6 @@ class Phaser(Module):
              Register(write=False), Register(write=False)),
             # dac test data for duc_cfg:data_select == 1
             ("dac1_test", Register(), Register(), Register(), Register()),
-
-            # 48 regs
-
-            # 66 servo regs
-
             # (ch0_profile[2], en0)
             ("servo0_cfg", Register()),
             # (ch1_profile[2], en1)
@@ -210,6 +205,7 @@ class Phaser(Module):
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
+        # gainbits = 1 can be seen as one bit of implied gain aka an a0 coefficient of 0.5
         self.submodules.iir = iir = Iir(self.decoder, w_coeff=16, w_data=16,
                                         gainbits=1, nr_profiles=SERVO_PROFILES, nr_channels=SERVO_CHANNELS)
         self.comb += [
@@ -251,8 +247,8 @@ class Phaser(Module):
                 self.comb += [
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
-                    servo_dsp_i.c.eq(0x7fff),  # rounding offset
-                    servo_dsp_q.c.eq(0x7fff)
+                    servo_dsp_i.c.eq(0x3fff),  # rounding offset
+                    servo_dsp_q.c.eq(0x3fff)
                 ]
                 self.sync += [
                     If(cfg[2:4] == 0,  # ducx_cfg_sel

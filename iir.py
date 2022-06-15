@@ -1,11 +1,10 @@
 #!/usr/bin/python3
-# first order iir for multiple channels and profiles with one DSP and no blockram
-#
-# round half down
+# First order IIR filter for multiple channels and profiles with one DSP and no blockram.
+# DSP block with MSB aligned inputs and "round half down" rounding.
+# Can be used with Phasers decoder by passing this module. Without decoder pass `None`.
+# 
 #
 # Note: Migen translates the "out of range" pc mux selector to the last vaid mux input.
-#
-# Maybe Todo: replace [pc != 0] with [!OR(pc)]
 
 # Todo: clipping
 from migen import *
@@ -70,7 +69,7 @@ class Iir(Module):
                 nr_channels) for j in range(nr_profiles)]
             self.sync += [
                 If(stb_out,
-                   ch_profile[0].eq(decoder.get(f"servo0_cfg", "write")>>1),
+                   ch_profile[0].eq(decoder.get(f"servo0_cfg", "write")>>1), # bit 0 is the ch enable bit
                    ch_profile[1].eq(decoder.get(f"servo1_cfg", "write")>>1))
             ]
 
@@ -106,12 +105,3 @@ class Iir(Module):
             outp[0].eq(xy[2][ch_profile[0]][0]),
             outp[1].eq(xy[2][ch_profile[1]][1]),
         ]
-
-
-if __name__ == "__main__":
-    iir = Iir(None, w_coeff=16, w_data=16,
-              gainbits=1, nr_profiles=4, nr_channels=2)
-    o = convert2verilog(iir, name="iir", ios={
-                        iir.stb_in, iir.stb_out, iir.inp[0], iir.outp[0], iir.ab[0][0][0], iir.ab[0][1][0], iir.ch_profile[0]})
-    with open('iir.v', 'w') as file:
-        file.write(o.main_source)
