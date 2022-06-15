@@ -7,7 +7,7 @@ from link import Link
 from decode import Decode, Register
 from dac_data import DacData
 from adc import Adc, AdcParams
-from iir import Iir
+from iir import Iir, Dsp
 
 SERVO_PROFILES = 4  # number iir coefficient profiles per servo channel
 SERVO_CHANNELS = 2  # number servochannels
@@ -125,12 +125,12 @@ class Phaser(Module):
 
             # 48 regs
 
-            # 71 servo regs
+            # 66 servo regs
 
             # (ch0_profile[2], en0)
-            ("servo_cfg_0", Register()),
+            ("servo0_cfg", Register()),
             # (ch1_profile[2], en1)
-            ("servo_cfg_1", Register()),
+            ("servo1_cfg", Register()),
         ] +
             # ab register
             [(f"ch{i}_profile{j}_coeff{k}", Register(read=False), Register(read=False))
@@ -229,6 +229,7 @@ class Phaser(Module):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
             cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
+            servo_en = self.decoder.get("servo{}_cfg".format(ch), "write")[0]
             self.sync += [
                 # keep accu cleared
                 duc.clr.eq(cfg[0]),
@@ -244,24 +245,27 @@ class Phaser(Module):
                    ),
             ]
             for t, (ti, to) in enumerate(zip(duc.i, duc.o)):
+                servo_dsp_i = Dsp()
+                servo_dsp_q = Dsp()
+                self.submodules += [servo_dsp_i, servo_dsp_q]
                 self.comb += [
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
+                    servo_dsp_i.c.eq(0x7fff),  # rounding offset
+                    servo_dsp_q.c.eq(0x7fff)
                 ]
                 self.sync += [
                     If(cfg[2:4] == 0,  # ducx_cfg_sel
                         self.dac.data[2*t][ch].eq(to.i),
                         self.dac.data[2*t + 1][ch].eq(to.q),
-                        # hack in adc data (overwrite)
-                        self.dac.data[1][0].eq(iir.outp[0]),
-                        self.dac.data[3][0].eq(iir.outp[0]),
-                        self.dac.data[0][0].eq(iir.outp[0]),
-                        self.dac.data[2][0].eq(iir.outp[0]),
-
-                        # self.dac.data[3][1].eq(adc.data[0]>>4),
-                        # self.dac.data[0][1].eq(adc.data[0]>>4),
-                        # self.dac.data[2][1].eq(adc.data[0]>>4),
-                        # self.dac.data[1][1].eq(adc.data[0]>>4),
+                       ),
+                    servo_dsp_i.a.eq(to.i),
+                    servo_dsp_q.a.eq(to.q),
+                    servo_dsp_i.b.eq(iir.outp[ch]),
+                    servo_dsp_q.b.eq(iir.outp[ch]),
+                    If(servo_en,
+                        self.dac.data[2*t][ch].eq(servo_dsp_i.p >> 15),
+                        self.dac.data[2*t + 1][ch].eq(servo_dsp_q.p >> 15),
                        )
                 ]
 

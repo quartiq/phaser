@@ -70,8 +70,8 @@ class Iir(Module):
                 nr_channels) for j in range(nr_profiles)]
             self.sync += [
                 If(stb_out,
-                   ch_profile[0].eq(decoder.get(f"servo_cfg_0", "write")),
-                   ch_profile[1].eq(decoder.get(f"servo_cfg_1", "write")))
+                   ch_profile[0].eq(decoder.get(f"servo0_cfg", "write")>>1),
+                   ch_profile[1].eq(decoder.get(f"servo1_cfg", "write")>>1))
             ]
 
         self.sync += [
