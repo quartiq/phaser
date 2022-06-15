@@ -80,8 +80,60 @@ def testbench_profile_switch(dut, inp, coeff, offset,outp):
         yield
     o = yield dut.outp[0]
     outp.append(o)
-    yield dut.ch_profile[0].eq(1)
     yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for i in range(15):
+        if i == 5:
+            yield dut.ch_profile[0].eq(1)
+
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    o = yield dut.outp[0]
+    outp.append(o)
+    yield dut.inp[0].eq(inp//2)
+    yield
+    yield dut.stb_in.eq(1)
+    yield dut.ch_profile[0].eq(0)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    yield dut.stb_in.eq(1)
+    yield
+    yield dut.stb_in.eq(0)
+    for _ in range(15):
+        yield
+    o = yield dut.outp[0]
+    outp.append(o)
+    yield dut.inp[0].eq(inp//2)
+    yield
+    yield dut.ch_profile[0].eq(0)
     yield dut.stb_in.eq(1)
     yield
     yield dut.stb_in.eq(0)
@@ -124,9 +176,11 @@ class TestIir(unittest.TestCase):
         offset = [10, 30]
         outp = []
         run_simulation(self.dut, testbench_profile_switch(
-            self.dut, inp, coeff, offset, outp), vcd_name="iir_ch_sw.vcd")
+            self.dut, inp, coeff, offset, outp), vcd_name="iir_pr_sw.vcd")
         self.assertEqual(inp//2 + offset[0], outp[0])
         self.assertEqual(inp*3//4 + offset[1], outp[1])
+        self.assertEqual(inp//4 + offset[0], outp[2])
+        self.assertEqual(inp//4 + offset[0], outp[3])
 
     def test_rounding(self):
         inp = 2345

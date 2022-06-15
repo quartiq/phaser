@@ -126,8 +126,11 @@ class Phaser(Module):
             # 48 regs
 
             # 71 servo regs
-            # (ch1_profile[3], ch0_profile[3], en)
-            ("servo_cfg", Register()),
+
+            # (ch0_profile[2], en0)
+            ("servo_cfg_0", Register()),
+            # (ch1_profile[2], en1)
+            ("servo_cfg_1", Register()),
         ] +
             # ab register
             [(f"ch{i}_profile{j}_coeff{k}", Register(read=False), Register(read=False))
@@ -255,10 +258,10 @@ class Phaser(Module):
                         self.dac.data[0][0].eq(iir.outp[0]),
                         self.dac.data[2][0].eq(iir.outp[0]),
 
-                        # self.dac.data[3][1].eq(adc.data[1]),
-                        # self.dac.data[0][1].eq(adc.data[1]),
-                        # self.dac.data[2][1].eq(adc.data[1]),
-                        # self.dac.data[1][1].eq(adc.data[1]),
+                        # self.dac.data[3][1].eq(adc.data[0]>>4),
+                        # self.dac.data[0][1].eq(adc.data[0]>>4),
+                        # self.dac.data[2][1].eq(adc.data[0]>>4),
+                        # self.dac.data[1][1].eq(adc.data[0]>>4),
                        )
                 ]
 

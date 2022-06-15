@@ -6,7 +6,11 @@
 # Note: Migen translates the "out of range" pc mux selector to the last vaid mux input.
 #
 # Maybe Todo: replace [pc != 0] with [!OR(pc)]
+
+# Todo: clipping
 from migen import *
+from migen.fhdl.verilog import convert as convert2verilog
+
 
 NR_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
 
@@ -50,26 +54,25 @@ class Iir(Module):
         self.pc = pc = Signal(max=nr_channels+1)  # position in channels
         self.busy = busy = Signal()
         self.step = step = Signal(2)  # computation step
+        self.ch_profile_last = ch_profile_last = Signal(max=nr_profiles + 1)
         self.submodules.dsp = dsp = Dsp()
         assert w_data <= len(dsp.b)
         assert w_coeff <= len(dsp.a)
         shift_c = len(dsp.a) + len(dsp.b) - w_data - gainbits - 1
-        # shift_c = w_coeff + w_data - w_data - gainbits - 1
-        # shift_c = 0
-        # shift_a = 0
-        # shift_b = 0
         shift_a = len(dsp.a) - w_coeff
         shift_b = len(dsp.b) - w_data
         c_rounding_offset = (1 << shift_c - 1) - 1
-        # c_rounding_offset = 0
 
         if decoder != None:
             self.comb += [ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "write")) for i in range(
                 nr_channels) for j in range(nr_profiles) for k in range(NR_COEFF)]
             self.comb += [offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "write")) for i in range(
                 nr_channels) for j in range(nr_profiles)]
-            self.sync += If(stb_in, Cat(self.ch_profile).eq(
-                decoder.get(f"servo_cfg", "write") >> 1))
+            self.sync += [
+                If(stb_out,
+                   ch_profile[0].eq(decoder.get(f"servo_cfg_0", "write")),
+                   ch_profile[1].eq(decoder.get(f"servo_cfg_1", "write")))
+            ]
 
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
@@ -85,7 +88,7 @@ class Iir(Module):
                     pc.eq(pc + 1),
                     pp.eq(ch_profile[pc+1]),
                     If((pc != 0) & (pc != nr_channels+1),
-                        xy[2][ch_profile[pc-1]][pc-1].eq(dsp.p >> shift_c))),
+                        xy[2][ch_profile_last][pc-1].eq(dsp.p >> shift_c))),
                ),
             # if done with all channels and last data through dsp
             If((pc == nr_channels) & (step == 2),
@@ -99,6 +102,16 @@ class Iir(Module):
             dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]
         self.comb += [
-            # pp.eq(ch_profile[pc]),
-            [outp.eq(y0) for outp, y0 in zip(outp, xy[2][pp])]
+            ch_profile_last.eq(ch_profile[pc-1]),
+            outp[0].eq(xy[2][ch_profile[0]][0]),
+            outp[1].eq(xy[2][ch_profile[1]][1]),
         ]
+
+
+if __name__ == "__main__":
+    iir = Iir(None, w_coeff=16, w_data=16,
+              gainbits=1, nr_profiles=4, nr_channels=2)
+    o = convert2verilog(iir, name="iir", ios={
+                        iir.stb_in, iir.stb_out, iir.inp[0], iir.outp[0], iir.ab[0][0][0], iir.ab[0][1][0], iir.ch_profile[0]})
+    with open('iir.v', 'w') as file:
+        file.write(o.main_source)
