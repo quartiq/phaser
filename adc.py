@@ -52,7 +52,8 @@ class Adc(Module):
         self.cnvn = cnvn = Signal()
         self.sdo = sdo = [Signal(), Signal()]
         self.sdo2n = sdo2n = Signal()  # inverted input
-        self.ddr_clk_synth = ddr_clk_synth = Signal(6, reset=0b000111)  # signal to generate a 10ns period clock
+        self.ddr_clk_synth = ddr_clk_synth = Signal(
+            6, reset=0b000111)  # signal to generate a 10ns period clock
 
         if pins != None:
             self.specials += [
@@ -88,8 +89,9 @@ class Adc(Module):
             If(count_done,
                count.eq(count_load),
                ),
-            If(sck_en, Cat(ddr_clk_synth).eq(Cat(ddr_clk_synth[-2:], ddr_clk_synth))),
-            If(ddr_clk_synth == 0b11, ddr_clk_synth.eq(0))
+            # 6 bit barrel shifter that shifts by two each cycle
+            If(sck_en, Cat(ddr_clk_synth).eq(
+                Cat(ddr_clk_synth[-2:], ddr_clk_synth))),
         ]
 
         self.submodules.fsm = fsm = FSM("IDLE")

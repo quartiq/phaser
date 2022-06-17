@@ -205,9 +205,9 @@ class Phaser(Module):
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
         self.comb += adc.start.eq(1)
-        # gainbits = 1 can be seen as one bit of implied gain aka an a0 coefficient of 0.5
+        # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(self.decoder, w_coeff=16, w_data=16,
-                                        gainbits=1, nr_profiles=SERVO_PROFILES, nr_channels=SERVO_CHANNELS)
+                                        log2_a0=14, n_profiles=SERVO_PROFILES, n_channels=SERVO_CHANNELS)
         self.comb += [
             [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
             iir.stb_in.eq(adc.done)
