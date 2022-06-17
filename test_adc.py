@@ -22,8 +22,6 @@ class TestInter(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    adc_p = AdcParams(width=16, channels=2, lanes=2,
-                      t_cnvh=8, t_conv=3, t_rtt=10)
+    adc_p = AdcParams(width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=10)
     dut = Adc(None, adc_p)
-    run_simulation(dut, testbench(
-        dut), vcd_name="adc.vcd")
+    run_simulation(dut, testbench(dut), vcd_name="adc.vcd")
