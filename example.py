@@ -3,6 +3,7 @@ from artiq.experiment import *
 # This is a volatile test script to exercise and evaluate some functionality of
 # Phaser through ARTIQ.
 
+
 class Phaser(EnvExperiment):
     def build(self):
         self.setattr_device("core")
@@ -10,7 +11,7 @@ class Phaser(EnvExperiment):
 
     @rpc(flags={"async"})
     def p(self, *p):
-        print([hex(_ & 0xffffffff) for _ in p])
+        print([hex(_ & 0xFFFFFFFF) for _ in p])
 
     def run(self):
         self.do()
@@ -29,31 +30,33 @@ class Phaser(EnvExperiment):
         f.init(debug=True)
 
         for ch in range(2):
-            f.channel[ch].set_att(0*dB)
+            f.channel[ch].set_att(0 * dB)
             # f.channel[ch].set_duc_frequency_mu(0)
-            f.channel[ch].set_duc_frequency(190.598551*MHz)
-            f.channel[ch].set_duc_phase(.25)
+            f.channel[ch].set_duc_frequency(190.598551 * MHz)
+            f.channel[ch].set_duc_phase(0.25)
             f.channel[ch].set_duc_cfg(select=0, clr=0)
-            delay(.1*ms)
+            delay(0.1 * ms)
             for osc in range(5):
-                ftw = (osc + 1)*1.875391*MHz
-                asf = (osc + 1)*.066
-                #if osc != 4:
+                ftw = (osc + 1) * 1.875391 * MHz
+                asf = (osc + 1) * 0.066
+                # if osc != 4:
                 #    asf = 0.
-                #else:
+                # else:
                 #    asf = .9
                 #    ftw = 9.5*MHz
                 # f.channel[ch].oscillator[osc].set_frequency_mu(0)
                 f.channel[ch].oscillator[osc].set_frequency(ftw)
-                delay(.1*ms)
-                f.channel[ch].oscillator[osc].set_amplitude_phase(asf, phase=.25, clr=0)
-                delay(.1*ms)
+                delay(0.1 * ms)
+                f.channel[ch].oscillator[osc].set_amplitude_phase(
+                    asf, phase=0.25, clr=0
+                )
+                delay(0.1 * ms)
         f.duc_stb()
 
         for ch in range(2):
             for addr in range(8):
                 r = f.channel[ch].trf_read(addr)
-                delay(.1*ms)
+                delay(0.1 * ms)
                 self.p(r)
                 self.core.break_realtime()
 
