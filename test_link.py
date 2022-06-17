@@ -37,6 +37,7 @@ class TestSlip(unittest.TestCase):
                 self.assertEqual((yield self.dut.bitslip), 0)
             yield
             self.assertEqual((yield self.dut.bitslip), 1)
+
         run_simulation(self.dut, gen())
 
 
@@ -44,20 +45,20 @@ def pack(data):
     n_frame = 10
     n_data = 7
     t_clk = 8
-    n_marker = n_frame//2 + 1
+    n_marker = n_frame // 2 + 1
     n_crc = 6
-    assert len(data) == n_frame*(n_data - 1)*t_clk - n_marker - n_crc
+    assert len(data) == n_frame * (n_data - 1) * t_clk - n_marker - n_crc
     frame = []
     for i in range(n_frame):
         for j in range(t_clk):
             b = 0
-            if j >= t_clk//2:
+            if j >= t_clk // 2:
                 b |= 1
             if j == t_clk - 1:
                 if i == n_frame - 1:
                     # CRC-6-GSM
                     # b |= CRC(0x3f, data_width=6)(frame) << 1
-                    b |= 0x3f << 1  # TODO
+                    b |= 0x3F << 1  # TODO
                     frame.append(b)
                     continue
                 elif i == n_frame - 2:
@@ -127,31 +128,39 @@ class TestUnframe(unittest.TestCase):
 
     def test_mini(self):
         bits = []
-        run_simulation(self.dut,
-            [self.feed_bits([]), self.record_frame(bits)])
+        run_simulation(self.dut, [self.feed_bits([]), self.record_frame(bits)])
         self.assertEqual(bits, [])
 
     def test_zeros(self):
-        frame = pack([0] * (10*8*6 - 6 - 6))
+        frame = pack([0] * (10 * 8 * 6 - 6 - 6))
         frame[-1] = 1 | (0x13 << 1)  # crc
         bits = []
-        run_simulation(self.dut,
-            [self.feed_bits(frame), self.record_frame(bits)])
-        self.assertEqual(len(bits), 10*8)
+        run_simulation(self.dut, [self.feed_bits(frame), self.record_frame(bits)])
+        self.assertEqual(len(bits), 10 * 8)
         self.assertEqual(bits[-8 - 1], 1)
-        self.assertTrue(all(bits[i] == 0 for i in range(len(bits))
-            if i not in (len(bits) - 8 - 1, len(bits) - 1)), bits)
+        self.assertTrue(
+            all(
+                bits[i] == 0
+                for i in range(len(bits))
+                if i not in (len(bits) - 8 - 1, len(bits) - 1)
+            ),
+            bits,
+        )
 
     def test_ones(self):
-        frame = pack([1] * (10*8*6 - 6 - 6))
-        frame[-1] = 1 | (0x0b << 1)  # crc
+        frame = pack([1] * (10 * 8 * 6 - 6 - 6))
+        frame[-1] = 1 | (0x0B << 1)  # crc
         bits = []
         rec_frame = []
-        run_simulation(self.dut,
-            [self.feed_bits(frame),
-             self.record_frame(bits),
-             self.record_check(rec_frame)])
-        self.assertEqual(len(bits), 10*8)
-        #self.assertEqual(bits[-8 - 1], 0x3f)
+        run_simulation(
+            self.dut,
+            [
+                self.feed_bits(frame),
+                self.record_frame(bits),
+                self.record_check(rec_frame),
+            ],
+        )
+        self.assertEqual(len(bits), 10 * 8)
+        # self.assertEqual(bits[-8 - 1], 0x3f)
         self.assertEqual(len(rec_frame), 1)
-        #self.assertEqual(rec_frame[0], (1 << 10*8*6 - 6 - 6) - 1)
+        # self.assertEqual(rec_frame[0], (1 << 10*8*6 - 6 - 6) - 1)

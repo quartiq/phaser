@@ -10,7 +10,7 @@ def feed(endpoint, x, rate):
     n, d = rate
     t = 0
     for i, xi in enumerate(x):
-        while t*n < i*d:
+        while t * n < i * d:
             yield
             t += 1
         yield endpoint.data.eq(int(xi))
@@ -44,12 +44,14 @@ class TestInter(unittest.TestCase):
 
     def test_seq(self):
         # impulse response plus latency
-        x = [(1 << 13) - 1] + [0]*(30 + 10)
+        x = [(1 << 13) - 1] + [0] * (30 + 10)
         y = []
-        run_simulation(self.dut, [feed(self.dut.input, x, rate=(1, 10)),
-                                  retrieve(self.dut.output, y)],
-                       vcd_name="int.vcd")
+        run_simulation(
+            self.dut,
+            [feed(self.dut.input, x, rate=(1, 10)), retrieve(self.dut.output, y)],
+            vcd_name="int.vcd",
+        )
         y = np.ravel(y)
         print(repr(y))
-        #y0 =
-        #np.testing.assert_equal(y, y0)
+        # y0 =
+        # np.testing.assert_equal(y, y0)

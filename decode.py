@@ -6,12 +6,7 @@ from misoc.cores.duc import complex
 from interpolate import SampleMux, InterpolateChannel
 
 
-header_layout = [
-    ("we", 1),
-    ("addr", 7),
-    ("data", 8),
-    ("type", 4)
-]
+header_layout = [("we", 1), ("addr", 7), ("data", 8), ("type", 4)]
 
 # straming gearbox
 #
@@ -20,11 +15,13 @@ header_layout = [
 # 66666666666666666666666666666665666666656666666566666665666666656666666566666660
 #   4 2 0  4 2 0  4 2 0  4 2 0  4
 
+
 class SampleGearbox(Module):
     """Variable width input uneven ratio gearbox (e.g. 5/6 to 7)
 
     `data_width <= sample_width`
     """
+
     def __init__(self, data_width, sample_width):
         self.data = Signal(data_width, reset_less=True)
         self.data_short = Signal()  # disregard data lsb
@@ -39,37 +36,43 @@ class SampleGearbox(Module):
         outgoing = Signal(max=sample_width + 1)
         full = Signal()
         self.comb += [
-            If(self.data_stb,
-                If(self.data_short,
-                    incoming.eq(data_width - 1),
-                ).Else(
+            If(
+                self.data_stb,
+                If(self.data_short, incoming.eq(data_width - 1),).Else(
                     incoming.eq(data_width),
                 ),
             ).Else(
                 incoming.eq(0),
             ),
             full.eq(level >= sample_width),
-            If(full,
-                outgoing.eq(sample_width),
-            ).Else(
+            If(full, outgoing.eq(sample_width),).Else(
                 outgoing.eq(0),
             ),
         ]
         self.sync += [
-            If(self.data_stb,
-                buf.eq(Mux(self.data_short,
-                           Cat(self.data[1:], buf),
-                           Cat(self.data, buf),
-                )),
+            If(
+                self.data_stb,
+                buf.eq(
+                    Mux(
+                        self.data_short,
+                        Cat(self.data[1:], buf),
+                        Cat(self.data, buf),
+                    )
+                ),
             ),
             self.sample_stb.eq(full),
-            If(full,
-                self.sample.eq(Case(level, {
-                    sample_width + i: buf[i:] for i in range(data_width - 1)
-                })),
+            If(
+                full,
+                self.sample.eq(
+                    Case(
+                        level,
+                        {sample_width + i: buf[i:] for i in range(data_width - 1)},
+                    )
+                ),
             ),
             level.eq(level + incoming - outgoing),
-            If(self.clr,
+            If(
+                self.clr,
                 level.eq(0),
             ),
         ]
@@ -86,6 +89,7 @@ bus_layout = [
 
 class Register(Module):
     """Configuration/status register"""
+
     def __init__(self, width=None, read=True, write=True, readback=True):
         self.bus = Record(bus_layout)
         if width is None:
@@ -115,8 +119,9 @@ class Bus(Module):
     def _check_intersection(self, adr, mask):
         for _, b_adr, b_mask in self._slaves:
             if intersection((b_adr, b_mask), (adr, mask)):
-                raise ValueError("{} intersects {}".format(
-                    (adr, mask), (b_adr, b_mask)))
+                raise ValueError(
+                    "{} intersects {}".format((adr, mask), (b_adr, b_mask))
+                )
 
     def connect(self, bus, adr, mask):
         adr &= mask
@@ -129,9 +134,7 @@ class Bus(Module):
             bus.dat_w.eq(self.bus.dat_w),
             bus.we.eq(self.bus.we & stb),
             bus.re.eq(self.bus.re & stb),
-            If(stb,
-                self.bus.dat_r.eq(bus.dat_r)
-            )
+            If(stb, self.bus.dat_r.eq(bus.dat_r)),
         ]
 
 
@@ -139,10 +142,11 @@ class Decode(Module):
     """Decode a frame into samples and metadata and drive
     a bus of registers from the metadata.
     """
+
     def __init__(self, b_sample, n_channel, n_mux, t_frame):
-        n_samples = n_mux*n_channel*2
+        n_samples = n_mux * n_channel * 2
         header = Record(header_layout)
-        body = Signal(n_samples*b_sample)
+        body = Signal(n_samples * b_sample)
         self.frame = Signal(len(body) + len(header))
         self.stb = Signal()
         self.response = Signal(8)
@@ -151,16 +155,15 @@ class Decode(Module):
         ]
 
         self.submodules.zoh = SampleMux(
-            b_sample=b_sample, n_channel=n_channel, n_mux=n_mux,
-            t_frame=t_frame)
+            b_sample=b_sample, n_channel=n_channel, n_mux=n_mux, t_frame=t_frame
+        )
         self.comb += [
             self.zoh.body.eq(body),
             self.zoh.body_stb.eq(self.stb & (header.type == 1)),
         ]
 
         self.interpolate = []
-        self.data = [[Record(complex(16)) for _ in range(n_channel)]
-                         for _ in range(2)]
+        self.data = [[Record(complex(16)) for _ in range(n_channel)] for _ in range(2)]
         for ch in range(n_channel):
             for iq in "iq":
                 inter = InterpolateChannel()
@@ -194,7 +197,7 @@ class Decode(Module):
             assert name not in self.registers
             self.registers[name] = regs
             for i, reg in enumerate(regs):
-                self.bus.connect(reg.bus, addr, mask=0x7f)
+                self.bus.connect(reg.bus, addr, mask=0x7F)
                 assert addr not in self.mem_map
                 self.mem_map[addr] = (name, i)
                 self.submodules += reg
