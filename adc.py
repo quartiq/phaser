@@ -1,14 +1,6 @@
-from cgitb import reset
-import logging
 from collections import namedtuple
 from migen.genlib.io import DifferentialInput, DifferentialOutput, DDROutput
-
-
 from migen import *
-from migen.genlib import io
-
-
-logger = logging.getLogger(__name__)
 
 
 # all times in cycles

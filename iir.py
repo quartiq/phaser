@@ -7,7 +7,7 @@
 
 from migen import *
 
-NR_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
+N_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
 
 
 class Dsp(Module):
@@ -35,7 +35,7 @@ class Iir(Module):
                 Array(Signal((w_coeff, True)) for _ in range(n_channels))
                 for _ in range(n_profiles)
             )
-            for _ in range(NR_COEFF)
+            for _ in range(N_COEFF)
         )
         self.offset = offset = Array(
             Array(Signal((w_data, True)) for _ in range(n_channels))
@@ -45,13 +45,15 @@ class Iir(Module):
         self.ch_profile = ch_profile = Array(
             Signal(max=n_profiles + 1) for _ in range(n_channels)
         )
+        # output hold signal for each channel
+        self.hold = hold = Array(Signal() for _ in range(n_channels))
         ###
         self.xy = xy = Array(
             Array(
                 Array(Signal((w_data, True)) for _ in range(n_channels))
                 for _ in range(n_profiles)
             )
-            for _ in range(NR_COEFF)
+            for _ in range(N_COEFF)
         )
         self.y0_clipped = y0_clipped = Signal((w_data, True))
         # position in profiles call this index
@@ -74,7 +76,7 @@ class Iir(Module):
                 ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "write"))
                 for i in range(n_channels)
                 for j in range(n_profiles)
-                for k in range(NR_COEFF)
+                for k in range(N_COEFF)
             ]
             self.comb += [
                 offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "write"))
@@ -84,9 +86,11 @@ class Iir(Module):
             self.sync += [
                 If(
                     stb_out,
-                    # bit 0 is the ch enable bit
-                    ch_profile[0].eq(decoder.get(f"servo0_cfg", "write") >> 1),
-                    ch_profile[1].eq(decoder.get(f"servo1_cfg", "write") >> 1),
+                    # bit 0 is the ch enable bit, bit 1 the hold bit
+                    ch_profile[0].eq(decoder.get(f"servo0_cfg", "write") >> 2),
+                    ch_profile[1].eq(decoder.get(f"servo1_cfg", "write") >> 2),
+                    hold[0].eq(decoder.get(f"servo0_cfg", "write") >> 1),
+                    hold[1].eq(decoder.get(f"servo1_cfg", "write") >> 1),
                 )
             ]
         self.sync += [
@@ -112,7 +116,7 @@ class Iir(Module):
                     pc.eq(pc + 1),
                     pp.eq(ch_profile[pc + 1]),
                     If(
-                        (pc != 0) & (pc != n_channels + 1),
+                        (pc != 0) & (pc != n_channels + 1) & ~hold[pc - 1],
                         xy[2][ch_profile_last_ch][pc - 1].eq(y0_clipped),
                     ),
                 ),
