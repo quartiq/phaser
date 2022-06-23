@@ -1,10 +1,10 @@
 # First order IIR filter for multiple channels and profiles with one DSP and no blockram.
 # DSP block with MSB aligned inputs and "round half down" rounding.
-# Can be used with Phasers decoder CSRs. Without decoder pass `None`.
 #
 #
 # Note: Migen translates the "out of range" pc mux selector to the last vaid mux input.
 
+from ast import Constant
 from migen import *
 
 N_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
@@ -47,21 +47,33 @@ class Iir(Module):
         )
         # output hold signal for each channel
         self.hold = hold = Array(Signal() for _ in range(n_channels))
+
         ###
-        self.xy = xy = Array(
-            Array(
-                Array(Signal((w_data, True)) for _ in range(n_channels))
-                for _ in range(n_profiles)
-            )
-            for _ in range(N_COEFF)
+
+        # Making these registers reset less results in worsend timing.
+        # y1 register unique for each profile
+        y1 = Array(
+            Array(Signal((w_data, True)) for _ in range(n_channels))
+            for _ in range(n_profiles)
         )
-        self.y0_clipped = y0_clipped = Signal((w_data, True))
-        # position in profiles call this index
-        self.pp = pp = Signal(max=n_profiles + 1)
-        self.pc = pc = Signal(max=n_channels + 1)  # position in channels
-        self.busy = busy = Signal()
-        self.step = step = Signal(2)  # computation step
-        self.ch_profile_last_ch = ch_profile_last_ch = Signal(max=n_profiles + 1)
+        # x0, x1 registers shared for all profiles
+        x = Array(
+            Array(Signal((w_data, True)) for _ in range(n_channels))
+            for _ in range(N_COEFF - 1)
+        )
+        y0_clipped = Signal((w_data, True))
+        profile_index = Signal(max=n_profiles + 1)
+        channel_index = Signal(max=n_channels + 1)
+        busy = Signal()
+        # computation steps/pipeline:
+        # 0    -> load coeff[0],xy[0]
+        # 1    -> load coeff[1],xy[1], m0=coeff[0]*xy[0]
+        # 2    -> load coeff[2],xy[2], m1=coeff[1]*xy[1], p0=offset+m0
+        # 1(3) ->                      m2=coeff[2]*xy[2], p1=p0+m1
+        # 2(4) ->                                         p2=p1+m2
+        # 3(5) ->                                                      retrieve data y0=clip(p2)?hold
+        step = Signal(2)  # computation step
+        ch_profile_last_ch = Signal(max=n_profiles + 1)  # auxillary signal for muxing
         self.submodules.dsp = dsp = Dsp()
         assert w_data <= len(dsp.b)
         assert w_coeff <= len(dsp.a)
@@ -70,19 +82,21 @@ class Iir(Module):
         shift_b = len(dsp.b) - w_data
         # +1 from standard sign bit
         n_sign = len(dsp.p) - len(dsp.a) - len(dsp.b) + w_data - log2_a0 + 1
-        c_rounding_offset = (1 << shift_c - 1) - 1
+        c_rounding_offset = Constant((1 << shift_c - 1) - 1, shift_c)
 
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
             stb_out.eq(0),
+            dsp.a.eq(coeff[step][profile_index][channel_index] << shift_a),
+            dsp.b.eq(
+                x[channel_index][step] << shift_b
+            ),  # overwritten later if at step==2
+            dsp.c.eq(Cat(c_rounding_offset, offset[profile_index][channel_index])),
             If(
-                stb_in,
+                stb_in & ~busy,
                 busy.eq(1),
-                pp.eq(ch_profile[pc]),
-                [
-                    [x0.eq(inp) for x0, inp in zip(xy[0][ch_profile[ch]], inp)]
-                    for ch in range(n_channels)
-                ],
+                profile_index.eq(ch_profile[channel_index]),
+                [xi[0].eq(i) for xi, i in zip(x, inp)],
             ),
             If(
                 busy,
@@ -92,37 +106,31 @@ class Iir(Module):
                     step == 2,
                     dsp.mux_p.eq(1),
                     step.eq(0),
-                    pc.eq(pc + 1),
-                    pp.eq(ch_profile[pc + 1]),
+                    channel_index.eq(channel_index + 1),
+                    profile_index.eq(ch_profile[channel_index + 1]),
+                    dsp.b.eq(y1[profile_index][channel_index] << shift_b),
                     If(
-                        (pc != 0) & (pc != n_channels + 1) & ~hold[pc - 1],
-                        xy[2][ch_profile_last_ch][pc - 1].eq(y0_clipped),
+                        (channel_index != 0)
+                        & (channel_index != n_channels + 1)
+                        & ~hold[channel_index - 1],
+                        y1[ch_profile_last_ch][channel_index - 1].eq(y0_clipped),
                     ),
                 ),
             ),
             # if done with all channels and last data is done
             If(
-                (pc == n_channels) & (step == 2),
-                pc.eq(0),
-                pp.eq(ch_profile[0]),
+                (channel_index == n_channels) & (step == 2),
+                channel_index.eq(0),
+                profile_index.eq(ch_profile[0]),
                 busy.eq(0),
                 stb_out.eq(1),
-                [
-                    [
-                        x1.eq(x0)
-                        for x1, x0 in zip(xy[1][ch_profile[ch]], xy[0][ch_profile[ch]])
-                    ]
-                    for ch in range(n_channels)
-                ],
+                [xi[1].eq(xi[0]) for xi in x],
             ),
-            dsp.a.eq(coeff[step][pp][pc] << shift_a),
-            dsp.b.eq(xy[step][pp][pc] << shift_b),
-            dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]
         self.comb += [
             # assign extra signal for xy adressing
-            ch_profile_last_ch.eq(ch_profile[pc - 1]),
-            [o.eq(xy[2][ch_profile[ch]][ch]) for o, ch in zip(outp, range(n_channels))],
+            ch_profile_last_ch.eq(ch_profile[channel_index - 1]),
+            [o.eq(y1[ch_profile[ch]][ch]) for ch, o in enumerate(outp)],
             # clipping to positive output range
             y0_clipped.eq(dsp.p >> shift_c),
             If(
