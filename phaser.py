@@ -248,6 +248,11 @@ class Phaser(Module):
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)
         self.comb += adc.start.eq(1)
 
+        # potential IIR improvements:
+        # - Use a0=-1: invert y0 before or after clipping and flip the other coefficient signs
+        # - a1 = (1 - epsilon) and pass epsilon as a 16 bit. Then use wider a1 in computation.
+        # - unsigned output to gain the sign bit for data
+
         # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(
             w_coeff=16,
