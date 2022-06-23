@@ -247,6 +247,7 @@ class Phaser(Module):
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)
         self.comb += adc.start.eq(1)
+
         # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(
             w_coeff=16,
@@ -319,8 +320,10 @@ class Phaser(Module):
                 self.comb += [
                     ti.i.eq(self.decoder.data[t][ch].i),
                     ti.q.eq(self.decoder.data[t][ch].q),
-                    servo_dsp_i.c.eq(0x3FFF),  # rounding offset
-                    servo_dsp_q.c.eq(0x3FFF),
+                    servo_dsp_i.c.eq(
+                        (1 << len(self.dac.data[2 * t][ch]) - 2) - 1
+                    ),  # rounding offset
+                    servo_dsp_q.c.eq((1 << len(self.dac.data[2 * t][ch]) - 2) - 1),
                 ]
                 self.sync += [
                     If(
@@ -334,8 +337,12 @@ class Phaser(Module):
                     servo_dsp_q.b.eq(iir.outp[ch]),
                     If(
                         n_servo_bypass,
-                        self.dac.data[2 * t][ch].eq(servo_dsp_i.p >> 15),
-                        self.dac.data[2 * t + 1][ch].eq(servo_dsp_q.p >> 15),
+                        self.dac.data[2 * t][ch].eq(
+                            servo_dsp_i.p >> len(self.dac.data[2 * t][ch] - 1)
+                        ),
+                        self.dac.data[2 * t + 1][ch].eq(
+                            servo_dsp_q.p >> len(self.dac.data[2 * t][ch] - 1)
+                        ),
                     ),
                 ]
 
