@@ -60,108 +60,101 @@ class Phaser(Module):
             ),
         ]
 
-        self.decoder.map_registers(
-            [
-                (0x00,),
-                # Sinara board id (19) as assigned in the Sinara EEPROM layout
-                ("board_id", Register(write=False)),
-                # hardware revision and variant
-                ("hw_rev", Register(write=False)),
-                # gateware revision
-                ("gw_rev", Register(write=False)),
-                # configuration (clk_sel, dac_resetb, dac_sleep,
-                # dac_txena, trf0_ps, trf1_ps, att0_rstn, att1_rstn)
-                ("cfg", Register()),
-                # status (dac_alarm, trf0_ld, trf1_ld, term0_stat,
-                # term1_stat, spi_idle)
-                ("sta", Register(write=False)),
-                # frame crc error counter
-                ("crc_err", Register(write=False)),
-                # led configuration
-                ("led", Register(width=6)),
-                # fan pwm duty cycle
-                ("fan", Register()),
-                # DUC settings update strobe
-                ("duc_stb", Register(write=False, read=False)),
-                # ADC gain configuration (pgia0_gain, pgia1_gain)
-                ("adc_cfg", Register(width=4)),
-                # spi configuration (offline, end, clk_phase, clk_polarity,
-                # half_duplex, lsb_first)
-                ("spi_cfg", Register()),
-                # spi divider and transaction length (div(5), len(3))
-                ("spi_divlen", Register()),
-                # spi chip select (dac, trf0, trf1, att0, att1)
-                ("spi_sel", Register()),
-                # spi mosi data and transaction start/continue
-                ("spi_datw", Register(read=False)),
-                # spi readback data, available after each transaction
-                ("spi_datr", Register(write=False)),
-                # dac data interface sync delay (for sync-dac_clk alignment and
-                # n-div/pll/ostr fifo output synchronization)
-                ("sync_dly", Register(width=3)),
-                (0x10,),
-                # digital upconverter (duc) configuration
-                # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
-                ("duc0_cfg", Register()),
-                ("duc0_reserved", Register(read=False, write=False)),
-                # duc frequency tuning word (msb first)
-                ("duc0_f", Register(), Register(), Register(), Register()),
-                # duc phase offset word
-                ("duc0_p", Register(), Register()),
-                # dac data
-                (
-                    "dac0_data",
-                    Register(write=False),
-                    Register(write=False),
-                    Register(write=False),
-                    Register(write=False),
-                ),
-                # dac test data for duc_cfg:data_select == 1
-                ("dac0_test", Register(), Register(), Register(), Register()),
-                (0x20,),
-                # digital upconverter (duc) configuration
-                # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
-                ("duc1_cfg", Register()),
-                ("duc1_reserved", Register(read=False, write=False)),
-                # duc frequency tuning word (msb first)
-                ("duc1_f", Register(), Register(), Register(), Register()),
-                # duc phase offset word
-                ("duc1_p", Register(), Register()),
-                # dac data
-                (
-                    "dac1_data",
-                    Register(write=False),
-                    Register(write=False),
-                    Register(write=False),
-                    Register(write=False),
-                ),
-                # dac test data for duc_cfg:data_select == 1
-                ("dac1_test", Register(), Register(), Register(), Register()),
-                (0x30,),
-                # (ch0_profile[2], en0)
-                ("servo0_cfg", Register()),
-                # (ch1_profile[2], en1)
-                ("servo1_cfg", Register()),
-            ]
-            +
-            # ab register
-            [
-                (
-                    f"ch{i}_profile{j}_coeff{k}",
-                    Register(read=False),
-                    Register(read=False),
-                )
-                for i in range(SERVO_CHANNELS)
-                for j in range(SERVO_PROFILES)
-                for k in range(3)
-            ]
-            # offset register
-            + [
-                (f"ch{i}_profile{j}_offset", Register(read=False), Register(read=False))
-                for i in range(SERVO_CHANNELS)
-                for j in range(SERVO_PROFILES)
-            ]
-        )
+        phaser_registers = [
+            (0x00,),
+            # Sinara board id (19) as assigned in the Sinara EEPROM layout
+            ("board_id", Register(write=False)),
+            # hardware revision and variant
+            ("hw_rev", Register(write=False)),
+            # gateware revision
+            ("gw_rev", Register(write=False)),
+            # configuration (clk_sel, dac_resetb, dac_sleep,
+            # dac_txena, trf0_ps, trf1_ps, att0_rstn, att1_rstn)
+            ("cfg", Register()),
+            # status (dac_alarm, trf0_ld, trf1_ld, term0_stat,
+            # term1_stat, spi_idle)
+            ("sta", Register(write=False)),
+            # frame crc error counter
+            ("crc_err", Register(write=False)),
+            # led configuration
+            ("led", Register(width=6)),
+            # fan pwm duty cycle
+            ("fan", Register()),
+            # DUC settings update strobe
+            ("duc_stb", Register(write=False, read=False)),
+            # ADC gain configuration (pgia0_gain, pgia1_gain)
+            ("adc_cfg", Register(width=4)),
+            # spi configuration (offline, end, clk_phase, clk_polarity,
+            # half_duplex, lsb_first)
+            ("spi_cfg", Register()),
+            # spi divider and transaction length (div(5), len(3))
+            ("spi_divlen", Register()),
+            # spi chip select (dac, trf0, trf1, att0, att1)
+            ("spi_sel", Register()),
+            # spi mosi data and transaction start/continue
+            ("spi_datw", Register(read=False)),
+            # spi readback data, available after each transaction
+            ("spi_datr", Register(write=False)),
+            # dac data interface sync delay (for sync-dac_clk alignment and
+            # n-div/pll/ostr fifo output synchronization)
+            ("sync_dly", Register(width=3)),
+            (0x10,),
+            # digital upconverter (duc) configuration
+            # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
+            ("duc0_cfg", Register()),
+            ("duc0_reserved", Register(read=False, write=False)),
+            # duc frequency tuning word (msb first)
+            ("duc0_f", Register(), Register(), Register(), Register()),
+            # duc phase offset word
+            ("duc0_p", Register(), Register()),
+            # dac data
+            (
+                "dac0_data",
+                Register(write=False),
+                Register(write=False),
+                Register(write=False),
+                Register(write=False),
+            ),
+            # dac test data for duc_cfg:data_select == 1
+            ("dac0_test", Register(), Register(), Register(), Register()),
+            (0x20,),
+            # digital upconverter (duc) configuration
+            # (accu_clr, accu_clr_once, data_select (0: duc, 1: test))
+            ("duc1_cfg", Register()),
+            ("duc1_reserved", Register(read=False, write=False)),
+            # duc frequency tuning word (msb first)
+            ("duc1_f", Register(), Register(), Register(), Register()),
+            # duc phase offset word
+            ("duc1_p", Register(), Register()),
+            # dac data
+            (
+                "dac1_data",
+                Register(write=False),
+                Register(write=False),
+                Register(write=False),
+                Register(write=False),
+            ),
+            # dac test data for duc_cfg:data_select == 1
+            ("dac1_test", Register(), Register(), Register(), Register()),
+            (0x30,),
+            # (ch0_profile[2], en0)
+            ("servo0_cfg", Register()),
+            # (ch1_profile[2], en1)
+            ("servo1_cfg", Register()),
+        ]
+
+        for i in range(SERVO_CHANNELS):
+            for j in range(SERVO_PROFILES):
+                for k in range(4):  # 3 coefficients + offset
+                    phaser_registers.append(
+                        (
+                            f"ch{i}_profile{j}_data{k}",
+                            Register(read=False),
+                            Register(read=False),
+                        )
+                    )
+
+        self.decoder.map_registers(phaser_registers)
 
         dac_ctrl = platform.request("dac_ctrl")
         trf_ctrl = [platform.request("trf_ctrl") for _ in range(2)]
@@ -247,7 +240,9 @@ class Phaser(Module):
         # 32 ns t_cnvh, 12 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 24 ns t_rtt/tDSCKLCNVH
         # Note that there is one extra cycle (4 ns) at the end of a transaction.
         # Total: 264 ns -> 3.788 MSps
-        adc_parameters = AdcParams(width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6)
+        adc_parameters = AdcParams(
+            width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6
+        )
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)
         self.comb += adc.start.eq(1)

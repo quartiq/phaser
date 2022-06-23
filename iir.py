@@ -73,13 +73,13 @@ class Iir(Module):
         c_rounding_offset = (1 << shift_c - 1) - 1
         if decoder != None:
             self.comb += [
-                ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_coeff{k}", "write"))
+                ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_data{k}", "write"))
                 for i in range(n_channels)
                 for j in range(n_profiles)
                 for k in range(N_COEFF)
             ]
             self.comb += [
-                offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_offset", "write"))
+                offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_data3", "write"))
                 for i in range(n_channels)
                 for j in range(n_profiles)
             ]
