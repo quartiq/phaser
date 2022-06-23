@@ -23,14 +23,14 @@ class Dsp(Module):
 
 
 class Iir(Module):
-    def __init__(self, decoder, w_coeff, w_data, log2_a0, n_profiles, n_channels):
+    def __init__(self, w_coeff, w_data, log2_a0, n_profiles, n_channels):
         # input strobe signal (start processing all channels)
         self.stb_in = stb_in = Signal()
         self.stb_out = stb_out = Signal()  # output strobe signal (all channels done)
         self.inp = inp = Array(Signal((w_data, True)) for _ in range(n_channels))
         self.outp = outp = Array(Signal((w_data, True)) for _ in range(n_channels))
-        # ab registers for all channels and profiles
-        self.ab = ab = Array(
+        # coeff registers for all channels and profiles
+        self.coeff = coeff = Array(
             Array(
                 Array(Signal((w_coeff, True)) for _ in range(n_channels))
                 for _ in range(n_profiles)
@@ -71,28 +71,7 @@ class Iir(Module):
         # +1 from standard sign bit
         n_sign = len(dsp.p) - len(dsp.a) - len(dsp.b) + w_data - log2_a0 + 1
         c_rounding_offset = (1 << shift_c - 1) - 1
-        if decoder != None:
-            self.comb += [
-                ab[k][j][i].eq(decoder.get(f"ch{i}_profile{j}_data{k}", "write"))
-                for i in range(n_channels)
-                for j in range(n_profiles)
-                for k in range(N_COEFF)
-            ]
-            self.comb += [
-                offset[j][i].eq(decoder.get(f"ch{i}_profile{j}_data3", "write"))
-                for i in range(n_channels)
-                for j in range(n_profiles)
-            ]
-            self.sync += [
-                If(
-                    stb_out,
-                    # bit 0 is the ch enable bit, bit 1 the hold bit
-                    ch_profile[0].eq(decoder.get(f"servo0_cfg", "write") >> 2),
-                    ch_profile[1].eq(decoder.get(f"servo1_cfg", "write") >> 2),
-                    hold[0].eq(decoder.get(f"servo0_cfg", "write") >> 1),
-                    hold[1].eq(decoder.get(f"servo1_cfg", "write") >> 1),
-                )
-            ]
+
         self.sync += [
             # default to 0 and set to 1 further down if computation done in this cycle
             stb_out.eq(0),
@@ -136,7 +115,7 @@ class Iir(Module):
                     for ch in range(n_channels)
                 ],
             ),
-            dsp.a.eq(ab[step][pp][pc] << shift_a),
+            dsp.a.eq(coeff[step][pp][pc] << shift_a),
             dsp.b.eq(xy[step][pp][pc] << shift_b),
             dsp.c.eq(Cat(c_rounding_offset, 0, offset[pp][pc])),
         ]

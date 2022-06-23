@@ -8,9 +8,9 @@ from migen import *
 
 def testbench_rounding(dut, inp, coeff, outp):
     yield dut.inp[0].eq(inp)
-    yield dut.ab[0][0][0].eq(coeff)
-    yield dut.ab[1][0][0].eq(coeff)
-    yield dut.ab[2][0][0].eq(0)
+    yield dut.coeff[0][0][0].eq(coeff)
+    yield dut.coeff[1][0][0].eq(coeff)
+    yield dut.coeff[2][0][0].eq(0)
     yield dut.stb_in.eq(1)
     yield
     yield dut.stb_in.eq(0)
@@ -23,9 +23,9 @@ def testbench_rounding(dut, inp, coeff, outp):
         yield
     o = yield dut.outp[0]
     outp.append(o)
-    yield dut.ab[0][0][0].eq(coeff)
-    yield dut.ab[1][0][0].eq(coeff + 1)  # add one LSB, should round up now
-    yield dut.ab[2][0][0].eq(0)
+    yield dut.coeff[0][0][0].eq(coeff)
+    yield dut.coeff[1][0][0].eq(coeff + 1)  # add one LSB, should round up now
+    yield dut.coeff[2][0][0].eq(0)
     yield dut.stb_in.eq(1)
     yield
     yield dut.stb_in.eq(0)
@@ -42,11 +42,11 @@ def testbench_rounding(dut, inp, coeff, outp):
 
 def testbench_profile_switch(dut, inp, coeff, offset, outp):
     yield dut.inp[0].eq(inp)
-    yield dut.ab[0][0][0].eq(coeff[0])
-    yield dut.ab[1][0][0].eq(coeff[0])
+    yield dut.coeff[0][0][0].eq(coeff[0])
+    yield dut.coeff[1][0][0].eq(coeff[0])
     yield dut.offset[0][0].eq(offset[0])
-    yield dut.ab[0][1][0].eq(coeff[1])
-    yield dut.ab[1][1][0].eq(coeff[1])
+    yield dut.coeff[0][1][0].eq(coeff[1])
+    yield dut.coeff[1][1][0].eq(coeff[1])
     yield dut.offset[1][0].eq(offset[1])
     yield dut.stb_in.eq(1)
     yield
@@ -90,9 +90,7 @@ def testbench_profile_switch(dut, inp, coeff, offset, outp):
 
 class TestIir(unittest.TestCase):
     def setUp(self):
-        self.dut = Iir(
-            decoder=None, w_coeff=24, w_data=16, log2_a0=15, n_profiles=2, n_channels=2
-        )
+        self.dut = Iir(w_coeff=24, w_data=16, log2_a0=15, n_profiles=2, n_channels=2)
 
     def test_profile_switch(self):
         inp = 1000

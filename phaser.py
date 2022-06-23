@@ -143,6 +143,7 @@ class Phaser(Module):
             ("servo1_cfg", Register()),
         ]
 
+        # add servo data registers
         for i in range(SERVO_CHANNELS):
             for j in range(SERVO_PROFILES):
                 for k in range(4):  # 3 coefficients + offset
@@ -248,7 +249,6 @@ class Phaser(Module):
         self.comb += adc.start.eq(1)
         # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(
-            self.decoder,
             w_coeff=16,
             w_data=16,
             log2_a0=14,
@@ -258,6 +258,29 @@ class Phaser(Module):
         self.comb += [
             [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
             iir.stb_in.eq(adc.done),
+        ]
+
+        # connect iir to servo data registers
+        for i in range(SERVO_CHANNELS):
+            for j in range(SERVO_PROFILES):
+                for k in range(3):  # 3 coefficients
+                    self.comb += iir.coeff[k][j][i].eq(
+                        self.decoder.get(f"ch{i}_profile{j}_data{k}", "write")
+                    )
+                self.comb += iir.offset[j][i].eq(
+                    self.decoder.get(f"ch{i}_profile{j}_data3", "write")
+                )
+
+        # connect hold and profile select so that they update after a filter update is done
+        self.sync += [
+            If(
+                iir.stb_out,
+                # bit 0 is the ch bypass bit, bit 1 the hold bit
+                iir.ch_profile[0].eq(self.decoder.get(f"servo0_cfg", "write")[2:]),
+                iir.ch_profile[1].eq(self.decoder.get(f"servo1_cfg", "write")[2:]),
+                iir.hold[0].eq(self.decoder.get(f"servo0_cfg", "write")[1]),
+                iir.hold[1].eq(self.decoder.get(f"servo1_cfg", "write")[1]),
+            )
         ]
 
         self.submodules.dac = DacData(platform.request("dac_data"))
@@ -272,7 +295,8 @@ class Phaser(Module):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
             cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
-            servo_en = self.decoder.get("servo{}_cfg".format(ch), "write")[0]
+            # negated servo bypass
+            n_servo_bypass = self.decoder.get("servo{}_cfg".format(ch), "write")[0]
             self.sync += [
                 # keep accu cleared
                 duc.clr.eq(cfg[0]),
@@ -309,7 +333,7 @@ class Phaser(Module):
                     servo_dsp_i.b.eq(iir.outp[ch]),
                     servo_dsp_q.b.eq(iir.outp[ch]),
                     If(
-                        servo_en,
+                        n_servo_bypass,
                         self.dac.data[2 * t][ch].eq(servo_dsp_i.p >> 15),
                         self.dac.data[2 * t + 1][ch].eq(servo_dsp_q.p >> 15),
                     ),
