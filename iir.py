@@ -19,7 +19,7 @@ class Dsp(Module):
         self.mux_p = mux_p = Signal()  # accumulator mux
         self.m = m = Signal((48, True), reset_less=True)
         self.p = p = Signal((48, True), reset_less=True)
-        self.sync += [m.eq(a * b), p.eq(Mux(mux_p, m + p, m + c))]
+        self.sync += [m.eq(a * b), p.eq(m + c), If(mux_p, p.eq(m + p))]
 
 
 class Iir(Module):

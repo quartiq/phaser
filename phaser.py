@@ -137,6 +137,7 @@ class Phaser(Module):
                 ),
                 # dac test data for duc_cfg:data_select == 1
                 ("dac1_test", Register(), Register(), Register(), Register()),
+                (0x30,),
                 # (ch0_profile[2], en0)
                 ("servo0_cfg", Register()),
                 # (ch1_profile[2], en1)
@@ -243,13 +244,12 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
-        # 5 MSps, timing adjusted for LTC2323-16
         # 32 ns t_cnvh, 12 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 24 ns t_rtt/tDSCKLCNVH
         # Note that there is one extra cycle (4 ns) at the end of a transaction.
         # Total: 264 ns -> 3.788 MSps
-        adc_p = AdcParams(width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6)
+        adc_parameters = AdcParams(width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6)
 
-        self.submodules.adc = adc = Adc(platform.request("adc"), adc_p)
+        self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)
         self.comb += adc.start.eq(1)
         # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(
