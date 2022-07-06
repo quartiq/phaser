@@ -281,7 +281,7 @@ class Phaser(Module):
         self.sync += [
             If(
                 iir.stb_out,
-                # bit 0 is the ch bypass bit, bit 1 the hold bit
+                # bit 0 is the ch enable bit, bit 1 the hold bit
                 iir.ch_profile[0].eq(self.decoder.get(f"servo0_cfg", "write")[2:]),
                 iir.ch_profile[1].eq(self.decoder.get(f"servo1_cfg", "write")[2:]),
                 iir.hold[0].eq(self.decoder.get(f"servo0_cfg", "write")[1]),
@@ -301,8 +301,7 @@ class Phaser(Module):
             duc = PhasedDUC(n=2, pwidth=19, fwidth=32, zl=10)
             self.submodules += duc
             cfg = self.decoder.get("duc{}_cfg".format(ch), "write")
-            # negated servo bypass
-            n_servo_bypass = self.decoder.get("servo{}_cfg".format(ch), "write")[0]
+            servo_enable = self.decoder.get("servo{}_cfg".format(ch), "write")[0]
             self.sync += [
                 # keep accu cleared
                 duc.clr.eq(cfg[0]),
@@ -341,7 +340,7 @@ class Phaser(Module):
                     servo_dsp_i.b.eq(iir.outp[ch]),
                     servo_dsp_q.b.eq(iir.outp[ch]),
                     If(
-                        n_servo_bypass,
+                        servo_enable,
                         self.dac.data[2 * t][ch].eq(
                             servo_dsp_i.p >> len(self.dac.data[2 * t][ch] - 1)
                         ),
