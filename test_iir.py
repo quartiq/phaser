@@ -1,12 +1,12 @@
 #!/usr/bin/python3
-# testbench for iir.rs
+# testbench for iir.py
 
 import unittest
 from iir import Iir
 from migen import *
 
 
-def testbench_rounding(dut, inp, coeff, outp):
+def rounding(dut, inp, coeff, outp):
     yield dut.inp[0].eq(inp)
     yield dut.coeff[0][0][0].eq(coeff)
     yield dut.coeff[1][0][0].eq(coeff)
@@ -40,7 +40,7 @@ def testbench_rounding(dut, inp, coeff, outp):
     outp.append(o)
 
 
-def testbench_profile_switch(dut, inp, coeff, offset, outp):
+def profile_switch(dut, inp, coeff, offset, outp):
     yield dut.inp[0].eq(inp)
     yield dut.coeff[0][0][0].eq(coeff[0])
     yield dut.coeff[1][0][0].eq(coeff[0])
@@ -97,9 +97,7 @@ class TestIir(unittest.TestCase):
         coeff = [0x200000, 0x300000]
         offset = [10, 30]
         outp = []
-        run_simulation(
-            self.dut, testbench_profile_switch(self.dut, inp, coeff, offset, outp)
-        )
+        run_simulation(self.dut, profile_switch(self.dut, inp, coeff, offset, outp))
         self.assertEqual(inp // 2 + offset[0], outp[0])
         self.assertEqual(inp * 3 // 4 + offset[1], outp[1])
 
@@ -107,6 +105,6 @@ class TestIir(unittest.TestCase):
         inp = 2345
         coeff = 0x200000  # 0.25 for both b0, b1
         outp = []
-        run_simulation(self.dut, testbench_rounding(self.dut, inp, coeff, outp))
+        run_simulation(self.dut, rounding(self.dut, inp, coeff, outp))
         self.assertEqual(inp // 2, outp[0])
         self.assertEqual((inp // 2) + 1, outp[1])
