@@ -1,3 +1,5 @@
+# Execute this as:
+#  vivado -mode batch -source flash.tcl -tclargs build/phaser.bit
 set bit [lindex $argv 0]
 set pfx [file rootname $bit]
 open_hw_manager
