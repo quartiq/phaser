@@ -137,9 +137,9 @@ class Fft(Module):
             self.comb += [  # fetching/loading ports
                 sign_bits_r.eq(Mux(self.x_in[15], 0xff, 0)),
                 sign_bits_i.eq(Mux(self.x_in[31], 0xff, 0)),
-                xram1_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_int:width_int+width_i], sign_bits_i)),
-                xram2a_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_int:width_int+width_i], sign_bits_i)),
-                xram2b_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_int:width_int+width_i], sign_bits_i)),
+                xram1_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
+                xram2a_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
+                xram2b_port1.dat_w.eq(Cat(self.x_in[:width_i], sign_bits_r, self.x_in[width_i:], sign_bits_i)),
             ]
         elif width_int == width_i:
             self.comb += [
