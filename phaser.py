@@ -342,10 +342,10 @@ class Phaser(Module):
                     If(
                         servo_enable,
                         self.dac.data[2 * t][ch].eq(
-                            servo_dsp_i.p >> len(self.dac.data[2 * t][ch] - 1)
+                            servo_dsp_i.p >> len(self.dac.data[2 * t][ch]) - 1
                         ),
                         self.dac.data[2 * t + 1][ch].eq(
-                            servo_dsp_q.p >> len(self.dac.data[2 * t][ch] - 1)
+                            servo_dsp_q.p >> len(self.dac.data[2 * t][ch]) - 1
                         ),
                     ),
                 ]
