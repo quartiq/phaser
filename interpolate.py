@@ -80,7 +80,7 @@ class MiniFIFO(Module):
 
 class InterpolateChannel(Module):
     def __init__(self):
-        h_fir = [24, -85, 281, -1314, 55856, -1314, 281, -85, 24]
+        h_fir = [24, -85, 281, -1314, 55852, -1314, 281, -85, 24]
         # ciccomp: cic droop and gain, rate 1/10, gain 2**9/5**4 ~ 0.9, 9 taps
         self.submodules.ciccomp = MAC_SYM_FIR(h_fir, width_d=24, width_coef=16)
         h_hbf0 = [
