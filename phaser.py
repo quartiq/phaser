@@ -238,11 +238,11 @@ class Phaser(Module):
             self.decoder.get("spi_datr", "read").eq(self.spi.reg.pdi),
         ]
 
-        # 32 ns t_cnvh, 12 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 24 ns t_rtt/tDSCKLCNVH
+        # 32 ns t_cnvh, 16 ns t_conv/t_DCNVSCKL, 192 ns data transfer, 20 ns t_rtt/tDSCKLCNVH
         # Note that there is one extra cycle (4 ns) at the end of a transaction.
         # Total: 264 ns -> 3.788 MSps
         adc_parameters = AdcParams(
-            width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6
+            width=16, channels=2, lanes=2, t_cnvh=8, t_conv=4, t_rtt=5
         )
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)

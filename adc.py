@@ -50,7 +50,7 @@ class Adc(Module):
         self.sdo2n = sdo2n = Signal()  # inverted input
         self.ddr_clk_synth = ddr_clk_synth = Signal(
             6, reset=0b000111
-        )  # signal to generate a 10ns period clock
+        )  # signal to generate a 4 ns * 3 = 12 ns period clock
 
         if pins != None:
             self.specials += [
@@ -59,7 +59,7 @@ class Adc(Module):
                 DifferentialOutput(~cnvn, pins.cnvn_n, pins.cnvn_p),  # swapped
                 DifferentialInput(pins.sdo_p[0], pins.sdo_n[0], sdo[0]),
                 DifferentialInput(pins.sdo_n[1], pins.sdo_p[1], sdo2n),  # swapped
-                DDROutput(ddr_clk_synth[1], ddr_clk_synth[0], sck, ClockSignal("sys")),
+                DDROutput(~ddr_clk_synth[1], ~ddr_clk_synth[0], sck, ClockSignal("sys")),
             ]
 
         self.comb += [
