@@ -2,12 +2,12 @@
 # DSP block with MSB aligned inputs and "round half down" rounding.
 #
 #
-# Note: Migen translates the "out of range" pc mux selector to the last vaid mux input.
+# Note: Migen translates the "out of range" pc mux selector to the last valid mux input.
 
 from ast import Constant
 from migen import *
 
-N_COEFF = 3  # [b0, b1, a0] number of coefficients for a first order iir
+N_COEFF = 3  # [b0, b1, a1] number of coefficients for a first order iir
 
 
 class Dsp(Module):
@@ -15,9 +15,9 @@ class Dsp(Module):
         # xilinx dsp architecture (subset)
         self.a = a = Signal((25, True), reset_less=True)
         self.b = b = Signal((18, True), reset_less=True)
-        self.c = c = Signal((48, True), reset_less=True)
+        self.c = c = Signal((41, True), reset_less=True)
         self.mux_p = mux_p = Signal()  # accumulator mux
-        self.m = m = Signal((48, True), reset_less=True)
+        self.m = m = Signal((43, True), reset_less=True)
         self.p = p = Signal((48, True), reset_less=True)
         self.sync += [m.eq(a * b), p.eq(m + c), If(mux_p, p.eq(m + p))]
 
@@ -50,7 +50,7 @@ class Iir(Module):
 
         ###
 
-        # Making these registers reset less results in worsend timing.
+        # Making these registers reset less results in worse timing.
         # y1 register unique for each profile
         y1 = Array(
             Array(Signal((w_data, True)) for _ in range(n_channels))
@@ -73,7 +73,7 @@ class Iir(Module):
         # 2(4) ->                                         p2=p1+m2
         # 3(5) ->                                                      retrieve data y0=clip(p2)?hold
         step = Signal(2)  # computation step
-        ch_profile_last_ch = Signal(max=n_profiles + 1)  # auxillary signal for muxing
+        ch_profile_last_ch = Signal(max=n_profiles + 1)  # auxiliary signal for muxing
         self.submodules.dsp = dsp = Dsp()
         assert w_data <= len(dsp.b)
         assert w_coeff <= len(dsp.a)
