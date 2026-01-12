@@ -12,6 +12,7 @@ from iir import Iir, Dsp
 SERVO_PROFILES = 4  # number iir coefficient profiles per servo channel
 SERVO_CHANNELS = 2  # number servochannels
 
+ADC_DATA_WIDTH = 16  # bits per adc channel
 
 class PWM(Module):
     """Pulse width modulation"""
@@ -46,6 +47,7 @@ class Phaser(Module):
         platform.add_period_constraint(eem.data0_p, 4.0 * 8)
         self.submodules.crg = CRG(platform, link=self.link.phy.clk)
         # Don't bother meeting s/h for the clk iserdes. We align it.
+        platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys.clk)
         platform.add_false_path_constraint(eem.data0_p, self.crg.cd_sys2.clk)
         self.submodules.decoder = Decode(
             b_sample=14, n_channel=2, n_mux=8, t_frame=8 * 10
@@ -154,6 +156,27 @@ class Phaser(Module):
                             Register(read=False),
                         )
                     )
+        
+        # place holder for miqro register
+        # 0x72 - 0x78 Miqro channel profile/window memories
+        for i in range(7):
+            phaser_registers.append(
+                (
+                    f"miqro_mem{i}",
+                    Register(),
+                )
+            )
+
+        # add adc data registers
+        # 0x79-0x7c
+        for ch in range(SERVO_CHANNELS):
+            for loc in ["lo", "hi"]:
+                phaser_registers.append(
+                    (
+                        f"adc_data{ch}_{loc}",
+                        Register(write=False),
+                )
+            )
 
         self.decoder.map_registers(phaser_registers)
 
@@ -242,7 +265,7 @@ class Phaser(Module):
         # Note that there is one extra cycle (4 ns) at the end of a transaction.
         # Total: 264 ns -> 3.788 MSps
         adc_parameters = AdcParams(
-            width=16, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6
+            width=ADC_DATA_WIDTH, channels=2, lanes=2, t_cnvh=8, t_conv=3, t_rtt=6
         )
 
         self.submodules.adc = adc = Adc(platform.request("adc"), adc_parameters)
@@ -255,8 +278,8 @@ class Phaser(Module):
 
         # log2_a0 = 14 bit for an effective fixedpoint a0 of 0.5
         self.submodules.iir = iir = Iir(
-            w_coeff=16,
-            w_data=16,
+            w_coeff=16, 
+            w_data=ADC_DATA_WIDTH,
             log2_a0=14,
             n_profiles=SERVO_PROFILES,
             n_channels=SERVO_CHANNELS,
@@ -265,6 +288,16 @@ class Phaser(Module):
             [inp.eq(data) for inp, data in zip(iir.inp, adc.data)],
             iir.stb_in.eq(adc.done),
         ]
+
+        # add adc data to adc data register
+        for ch in range(SERVO_CHANNELS):
+            assert SERVO_CHANNELS <= len(adc.data)
+            sample_reg = Signal((16, True), name=f"adc_sample_reg_{ch}")
+            self.sync += If(adc.done, sample_reg.eq(adc.data[ch]))
+            self.comb += [
+                self.decoder.get(f"adc_data{ch}_lo", "read").eq(sample_reg[0:8]),
+                self.decoder.get(f"adc_data{ch}_hi", "read").eq(sample_reg[8:16]),
+            ]
 
         # connect iir to servo data registers
         for i in range(SERVO_CHANNELS):
@@ -368,39 +401,40 @@ class Phaser(Module):
             ]
 
         # use liberally for debugging
-        self.comb += [
-            Cat([platform.request("test_point", i) for i in range(6)]).eq(
-                Cat(
-                    ClockSignal("clk125"),
-                    ClockSignal("link"),
-                    # ClockSignal(),
-                    # ResetSignal(),
-                    # # self.link.slip.bitslip,
-                    # # self.link.unframe.data[0],
-                    # # self.link.unframe.data[1],
-                    # # self.link.unframe.clk_stb,
-                    # # self.link.unframe.marker_stb,
-                    # # self.link.unframe.end_of_frame,
-                    # self.link.checker.frame_stb,
-                    # # self.decoder.bus.bus.we,
-                    # # self.decoder.bus.bus.re,
-                    # # self.decoder.bus.bus.adr[0],
-                    # self.link.checker.miso,
-                    # # self.dac.data_sync,
-                    # self.dac.istr,
-                    # dac_ctrl.alarm,
-                    ClockSignal("ret"),
-                    adc.cnvn,
-                    adc.sdo[0],
-                    adc.data[1][0],
-                )
-            )
-        ]
+        # self.comb += [
+        #     Cat([platform.request("test_point", i) for i in range(6)]).eq(
+        #         Cat(
+        #             ClockSignal("clk125"),
+        #             ClockSignal("link"),
+        #             # ClockSignal(),
+        #             # ResetSignal(),
+        #             # # self.link.slip.bitslip,
+        #             # # self.link.unframe.data[0],
+        #             # # self.link.unframe.data[1],
+        #             # # self.link.unframe.clk_stb,
+        #             # # self.link.unframe.marker_stb,
+        #             # # self.link.unframe.end_of_frame,
+        #             # self.link.checker.frame_stb,
+        #             # # self.decoder.bus.bus.we,
+        #             # # self.decoder.bus.bus.re,
+        #             # # self.decoder.bus.bus.adr[0],
+        #             # self.link.checker.miso,
+        #             # # self.dac.data_sync,
+        #             # self.dac.istr,
+        #             # dac_ctrl.alarm,
+        #             ClockSignal("ret"),
+        #             adc.cnvn,
+        #             adc.sdo[0],
+        #             adc.data[1][0],
+        #         )
+        #     )
+        # ]
 
 
 if __name__ == "__main__":
     from migen.build.platforms.sinara.phaser import Platform
 
+    # platform = Platform(speed_grade="-3")
     platform = Platform()
     # platform.toolchain.additional_commands.extend([
     #     "set argv phaser.bit",

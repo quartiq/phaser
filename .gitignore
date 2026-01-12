@@ -1,2 +1,8 @@
 /build
 /py
+/__pycache__/
+/.pytest_cache/
+*.jou
+*.log
+*.vcd
+*.gtkw
